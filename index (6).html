@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Frota Conecta</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #10141F; font-family: 'Segoe UI', Arial, sans-serif; }
+  input, textarea, button { font-family: inherit; }
+  .animate-spin { animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #10141F; }
+  ::-webkit-scrollbar-thumb { background: #2C3550; border-radius: 2px; }
+</style>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#FFB02E"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Frota Conecta"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const BACKEND_URL = "https://frota-conecta-backend.onrender.com";
+const API_KEY = "FC2024@frotaConecta#segura";
+
+const { useState, useEffect, useRef, useMemo } = React;
+
+const TIPOS = [
+  { id: "revisao", label: "Revisão" },
+  { id: "pneu", label: "Troca de pneu" },
+  { id: "parabrisa", label: "Troca de parabrisa" },
+  { id: "oleo", label: "Troca de óleo" },
+  { id: "sinistro", label: "Sinistro / Acidente" },
+  { id: "outro", label: "Outro" },
+];
+
+const STATUS = {
+  pendente: { label: "Pendente envio", color: "#C0392B" },
+  enviado: { label: "Enviado — aguardando resposta", color: "#D9A441" },
+  andamento: { label: "Em andamento", color: "#3D5A80" },
+  concluido: { label: "Concluído", color: "#2E7D32" },
+};
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function fmtDateTime(ts) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleDateString("pt-BR") + " " + new Date(ts).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+}
+function fmtDuration(ms) {
+  if (ms==null||ms<0) return "—";
+  const mins=Math.floor(ms/60000);
+  if(mins<60) return `${mins} min`;
+  const hrs=Math.floor(mins/60);
+  if(hrs<24) return `${hrs}h ${mins%60}min`;
+  return `${Math.floor(hrs/24)}d ${hrs%24}h`;
+}
+function compressImage(file,maxW=700,quality=0.6){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const scale=Math.min(1,maxW/img.width);
+        const canvas=document.createElement("canvas");
+        canvas.width=img.width*scale; canvas.height=img.height*scale;
+        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL("image/jpeg",quality));
+      };
+      img.onerror=reject; img.src=e.target.result;
+    };
+    reader.onerror=reject; reader.readAsDataURL(file);
+  });
+}
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=e=>resolve(e.target.result);
+    r.onerror=reject; r.readAsDataURL(file);
+  });
+}
+function buildEmailPreview(rec){
+  const tipo=TIPOS.find(t=>t.id===rec.tipo)?.label||rec.tipo;
+  const lines=[`Motorista: ${rec.motorista}`,`Placa: ${rec.placa}`,`Tipo: ${tipo}`,`Data: ${fmtDateTime(rec.criadoEm)}`,"","Descrição:",rec.descricao||"(sem descrição)"];
+  if(rec.tipo==="sinistro") lines.push("","⚠ Boletim de Ocorrência anexado.");
+  if(rec.fotos?.length) lines.push("",`📷 ${rec.fotos.length} foto(s) anexada(s).`);
+  return {subject:`[Manutenção] ${tipo} — Placa ${rec.placa} — ${rec.motorista}`,body:lines.join("\n")};
+}
+async function hashPin(pin){
+  const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("fc_salt_"+pin));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// Storage (localStorage para fora do Claude)
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null; } }
+function lsSet(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
+
+async function loadUsers(){ try{ return await apiGet("/api/usuarios"); } catch{ return lsGet("fc_usuarios")||[]; } }
+async function saveUser(u){ try{ return await apiPost("/api/usuarios",u); } catch{ const l=lsGet("fc_usuarios")||[]; lsSet("fc_usuarios",[...l.filter(x=>x.id!==u.id),u]); } }
+async function loadEmails(){ try{ return await apiGet("/api/emails"); } catch{ return lsGet("fc_emails")||[]; } }
+async function saveEmails(l){ try{ await apiPost("/api/emails",l); } catch{ lsSet("fc_emails",l); } }catch{ lsSet("fc_emails",l); } }
+
+async function apiPost(path,body){
+  const res=await fetch(BACKEND_URL+path,{method:"POST",headers:{"Content-Type":"application/json","x-api-key":API_KEY},body:JSON.stringify(body)});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||`Erro ${res.status}`);}
+  return res.json();
+}
+async function apiGet(path){
+  const res=await fetch(BACKEND_URL+path,{headers:{"x-api-key":API_KEY}});
+  if(!res.ok) throw new Error(`Erro ${res.status}`);
+  return res.json();
+}
+async function apiPatch(path,body){
+  const res=await fetch(BACKEND_URL+path,{method:"PATCH",headers:{"Content-Type":"application/json","x-api-key":API_KEY},body:JSON.stringify(body)});
+  if(!res.ok) throw new Error(`Erro ${res.status}`);
+  return res.json();
+}
+async function loadAllRecords(){
+  try{ return await apiGet("/api/solicitacoes"); }
+  catch{ return lsGet("fc_records")||[]; }
+}
+async function saveRecord(rec){
+  const l=lsGet("fc_records")||[];
+  lsSet("fc_records",[...l.filter(x=>x.id!==rec.id),rec].sort((a,b)=>b.criadoEm-a.criadoEm));
+}
+
+// ---------- UI Atoms ----------
+function Badge({status}){
+  const s=STATUS[status]||STATUS.pendente;
+  return <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:999,fontSize:11,fontWeight:700,background:s.color+"22",color:s.color,border:`1px solid ${s.color}55`}}>
+    <span style={{width:6,height:6,borderRadius:"50%",background:s.color}}/>
+    {s.label}
+  </span>;
+}
+function KPI({label,value,icon,accent}){
+  return <div style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:16,display:"flex",flexDirection:"column",gap:8}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <span style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.1em",color:"#7C8AAE"}}>{label}</span>
+    </div>
+    <div style={{fontSize:22,fontWeight:800,color:"#fff"}}>{value}</div>
+  </div>;
+}
+function Erro({msg}){
+  if(!msg) return null;
+  return <div style={{background:"#C0392B22",border:"1px solid #C0392B55",color:"#FF9B8A",borderRadius:8,padding:"10px 14px",fontSize:13,display:"flex",gap:8,alignItems:"flex-start"}}>
+    ⚠ {msg}
+  </div>;
+}
+function Btn({children,onClick,disabled,style={},variant="primary"}){
+  const base={width:"100%",borderRadius:12,padding:"14px 0",fontWeight:700,fontSize:15,border:"none",cursor:disabled?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:disabled?0.4:1,transition:"opacity 0.2s"};
+  const variants={primary:{background:"#FFB02E",color:"#1C2333"},secondary:{background:"#3D5A80",color:"#fff"},ghost:{background:"transparent",color:"#7C8AAE",border:"1px solid #2C3550"}};
+  return <button onClick={onClick} disabled={disabled} style={{...base,...variants[variant],...style}}>{children}</button>;
+}
+
+// ---------- Login ----------
+function LoginScreen({onLogin,users}){
+  const [role,setRole]=useState(null);
+  if(!role) return <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:24,paddingTop:32}}>
+    <div style={{width:64,height:64,background:"#FFB02E",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30}}>🚛</div>
+    <div style={{textAlign:"center"}}>
+      <h2 style={{color:"#fff",fontSize:20,fontWeight:800}}>Frota Conecta</h2>
+      <p style={{color:"#7C8AAE",fontSize:13,marginTop:4}}>Como você quer entrar?</p>
+    </div>
+    <div style={{width:"100%",display:"flex",flexDirection:"column",gap:12}}>
+      {[{r:"motorista",icon:"🚛",t:"Sou motorista",s:"Fazer uma solicitação de manutenção"},{r:"gestor",icon:"📋",t:"Sou gestor",s:"Acompanhar e gerenciar solicitações"}].map(o=>(
+        <button key={o.r} onClick={()=>setRole(o.r)} style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:"16px 20px",display:"flex",alignItems:"center",gap:16,cursor:"pointer",color:"white",textAlign:"left",width:"100%"}}>
+          <div style={{width:40,height:40,background:"#FFB02E22",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{o.icon}</div>
+          <div><div style={{fontWeight:700,fontSize:14}}>{o.t}</div><div style={{color:"#7C8AAE",fontSize:12,marginTop:2}}>{o.s}</div></div>
+        </button>
+      ))}
+    </div>
+  </div>;
+  if(role==="motorista") return <MotoristaLogin onLogin={onLogin} onBack={()=>setRole(null)} users={users}/>;
+  return <GestorLogin onLogin={onLogin} onBack={()=>setRole(null)} users={users}/>;
+}
+
+function PinInput({label,value,onChange,placeholder}){
+  const [show,setShow]=useState(false);
+  return <div style={{marginBottom:16}}>
+    <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE",display:"block",marginBottom:6}}>{label}</label>
+    <div style={{position:"relative"}}>
+      <input value={value} onChange={onChange} type={show?"text":"password"} placeholder={placeholder}
+        style={{width:"100%",background:"transparent",border:"none",borderBottom:"2px solid #3D5A80",paddingBottom:6,color:"#fff",fontSize:16,outline:"none",paddingRight:28}}/>
+      <button onClick={()=>setShow(v=>!v)} style={{position:"absolute",right:0,top:0,background:"none",border:"none",cursor:"pointer",color:"#7C8AAE",fontSize:16}}>{show?"🙈":"👁"}</button>
+    </div>
+  </div>;
+}
+function TextInput({label,value,onChange,placeholder,type="text"}){
+  return <div style={{marginBottom:16}}>
+    <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE",display:"block",marginBottom:6}}>{label}</label>
+    <input value={value} onChange={onChange} type={type} placeholder={placeholder}
+      style={{width:"100%",background:"transparent",border:"none",borderBottom:"2px solid #3D5A80",paddingBottom:6,color:"#fff",fontSize:16,outline:"none"}}/>
+  </div>;
+}
+
+function MotoristaLogin({onLogin,onBack,users}){
+  const [tab,setTab]=useState("entrar");
+  const [nome,setNome]=useState(""); const [pin,setPin]=useState(""); const [pinConf,setPinConf]=useState("");
+  const [loading,setLoading]=useState(false); const [erro,setErro]=useState("");
+  async function handleEntrar(){
+    if(!nome.trim()||pin.length<4){setErro("Preencha nome e PIN.");return;}
+    setLoading(true);setErro("");
+    const hash=await hashPin(pin);
+    try{
+      const user=await apiPost("/api/usuarios/login",{role:"motorista",nome:nome.trim(),pinHash:hash});
+      onLogin(user);setLoading(false);
+    }catch{setErro("Nome ou PIN incorretos.");setLoading(false);}
+  }
+  async function handleCadastrar(){
+    if(!nome.trim()||pin.length<4){setErro("Preencha nome e PIN.");return;}
+    if(pin!==pinConf){setErro("PINs não coincidem.");return;}
+    if(users.find(u=>u.role==="motorista"&&u.nome.trim().toLowerCase()===nome.trim().toLowerCase())){setErro("Nome já cadastrado.");return;}
+    setLoading(true);setErro("");
+    const pinHash=await hashPin(pin);
+    const user={id:uid(),role:"motorista",nome:nome.trim(),pinHash,criadoEm:Date.now()};
+    await saveUser(user);onLogin(user);setLoading(false);
+  }
+  return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <button onClick={onBack} style={{background:"none",border:"none",color:"#7C8AAE",cursor:"pointer",textAlign:"left",fontSize:13}}>← Voltar</button>
+    <div style={{display:"flex",background:"#1C2333",borderRadius:10,padding:4}}>
+      {["entrar","cadastrar"].map(t=><button key={t} onClick={()=>{setTab(t);setErro("");}} style={{flex:1,padding:"8px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:tab===t?"#FFB02E":"transparent",color:tab===t?"#1C2333":"#7C8AAE"}}>{t==="entrar"?"Entrar":"Primeiro acesso"}</button>)}
+    </div>
+    <TextInput label="Nome completo *" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Seu nome"/>
+    <PinInput label="PIN (4 dígitos) *" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••"/>
+    {tab==="cadastrar"&&<PinInput label="Confirmar PIN *" value={pinConf} onChange={e=>setPinConf(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••"/>}
+    <Erro msg={erro}/>
+    <Btn onClick={tab==="entrar"?handleEntrar:handleCadastrar} disabled={loading} variant="primary">{loading?"Aguarde...":tab==="entrar"?"🔑 Entrar":"✅ Criar conta e entrar"}</Btn>
+  </div>;
+}
+
+function GestorLogin({onLogin,onBack,users}){
+  const [tab,setTab]=useState("entrar");
+  const [usuario,setUsuario]=useState(""); const [senha,setSenha]=useState(""); const [senhaConf,setSenhaConf]=useState(""); const [codigo,setCodigo]=useState("");
+  const [loading,setLoading]=useState(false); const [erro,setErro]=useState("");
+  const CODIGO="FC2024";
+  async function handleEntrar(){
+    if(!usuario.trim()||!senha){setErro("Preencha usuário e senha.");return;}
+    setLoading(true);setErro("");
+    const hash=await hashPin(senha);
+    try{
+      const user=await apiPost("/api/usuarios/login",{role:"gestor",usuario:usuario.trim(),pinHash:hash});
+      onLogin(user);setLoading(false);
+    }catch{setErro("Usuário ou senha incorretos.");setLoading(false);}
+  }
+  async function handleCadastrar(){
+    if(!usuario.trim()||!senha){setErro("Preencha todos os campos.");return;}
+    if(senha!==senhaConf){setErro("Senhas não coincidem.");return;}
+    if(senha.length<6){setErro("Mínimo 6 caracteres.");return;}
+    if(codigo.toUpperCase()!==CODIGO){setErro("Código de administrador inválido.");return;}
+    if(users.find(u=>u.role==="gestor"&&u.usuario.trim().toLowerCase()===usuario.trim().toLowerCase())){setErro("Usuário já cadastrado.");return;}
+    setLoading(true);setErro("");
+    const pinHash=await hashPin(senha);
+    const user={id:uid(),role:"gestor",nome:usuario.trim(),usuario:usuario.trim(),pinHash,criadoEm:Date.now()};
+    await saveUser(user);onLogin(user);setLoading(false);
+  }
+  return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <button onClick={onBack} style={{background:"none",border:"none",color:"#7C8AAE",cursor:"pointer",textAlign:"left",fontSize:13}}>← Voltar</button>
+    <div style={{display:"flex",background:"#1C2333",borderRadius:10,padding:4}}>
+      {["entrar","cadastrar"].map(t=><button key={t} onClick={()=>{setTab(t);setErro("");}} style={{flex:1,padding:"8px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:tab===t?"#3D5A80":"transparent",color:tab===t?"#fff":"#7C8AAE"}}>{t==="entrar"?"Entrar":"Criar conta"}</button>)}
+    </div>
+    <TextInput label="Usuário *" value={usuario} onChange={e=>setUsuario(e.target.value)} placeholder="Nome de usuário"/>
+    <PinInput label="Senha *" value={senha} onChange={e=>setSenha(e.target.value)} placeholder="Sua senha"/>
+    {tab==="cadastrar"&&<>
+      <PinInput label="Confirmar senha *" value={senhaConf} onChange={e=>setSenhaConf(e.target.value)} placeholder="Confirme"/>
+      <div>
+        <PinInput label="Código de administrador *" value={codigo} onChange={e=>setCodigo(e.target.value)} placeholder="Código"/>
+        <p style={{color:"#7C8AAE",fontSize:11,marginTop:4}}>Nesta demo o código é <strong style={{color:"#FFB02E"}}>FC2024</strong></p>
+      </div>
+    </>}
+    <Erro msg={erro}/>
+    <Btn onClick={tab==="entrar"?handleEntrar:handleCadastrar} disabled={loading} variant="secondary">{loading?"Aguarde...":tab==="entrar"?"🔒 Entrar":"✅ Criar conta"}</Btn>
+  </div>;
+}
+
+// ---------- Driver View ----------
+function DriverView({user,records,onSubmitted}){
+  const [step,setStep]=useState("list");
+  const [placa,setPlaca]=useState(""); const [tipo,setTipo]=useState(""); const [descricao,setDescricao]=useState("");
+  const [fotos,setFotos]=useState([]); const [bo,setBo]=useState(null);
+  const [submitting,setSubmitting]=useState(false); const [done,setDone]=useState(null); const [erro,setErro]=useState("");
+  const MAX=10; const fotoRef=useRef(null); const boRef=useRef(null);
+  const minhas=useMemo(()=>records.filter(r=>r.motorista?.trim().toLowerCase()===user.nome?.trim().toLowerCase()),[records,user]);
+
+  async function handleFoto(e){
+    const files=Array.from(e.target.files||[]); if(!files.length) return; setErro("");
+    const vagas=MAX-fotos.length;
+    const sel=files.slice(0,vagas);
+    if(files.length>vagas) setErro(`Só foi possível adicionar ${vagas} foto(s). Limite de ${MAX}.`);
+    try{ const c=await Promise.all(sel.map(f=>compressImage(f))); setFotos(prev=>[...prev,...c]); }
+    catch{ setErro("Não foi possível processar as fotos."); }
+    if(fotoRef.current) fotoRef.current.value="";
+  }
+  async function handleBo(e){
+    const f=e.target.files?.[0]; if(!f) return; setErro("");
+    try{ setBo({name:f.name,dataUrl:await fileToDataUrl(f)}); }
+    catch{ setErro("Não foi possível anexar o BO."); }
+  }
+  function resetForm(){ setPlaca("");setTipo("");setDescricao("");setFotos([]);setBo(null);setErro("");
+    if(fotoRef.current) fotoRef.current.value=""; if(boRef.current) boRef.current.value=""; }
+
+  async function handleSubmit(){
+    if(!placa||!tipo||(tipo==="sinistro"&&!bo)) return;
+    setSubmitting(true);setErro("");
+    try{
+      const emailsCad=await loadEmails();
+      const destinatarios=emailsCad.filter(e=>e.ativo).map(e=>e.email);
+      const rec=await apiPost("/api/solicitacoes",{motorista:user.nome,placa:placa.trim().toUpperCase(),tipo,descricao:descricao.trim(),fotos,bo,destinatarios});
+      await saveRecord(rec);
+      await onSubmitted();
+      setDone({...rec,email:buildEmailPreview(rec),destinatarios});
+      resetForm();
+    }catch(err){
+      setErro(`Falha ao enviar: ${err.message}`);
+    }finally{ setSubmitting(false); }
+  }
+
+  if(done) return <div style={{display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",gap:16,paddingTop:32}}>
+    <div style={{width:64,height:64,background:"#2E7D3222",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>✅</div>
+    <div><h3 style={{color:"#fff",fontSize:18,fontWeight:800}}>Solicitação enviada!</h3>
+    <p style={{color:"#7C8AAE",fontSize:13,marginTop:4}}>E-mail encaminhado com PDF em anexo.</p></div>
+    {done.destinatarios?.length>0&&<div style={{width:"100%",background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:16,textAlign:"left"}}>
+      <p style={{color:"#FFB02E",fontSize:11,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.08em"}}>📧 Enviado para:</p>
+      {done.destinatarios.map((e,i)=><div key={i} style={{color:"#fff",fontSize:13,padding:"4px 0",borderBottom:"1px solid #2C3550"}}>@ {e}</div>)}
+    </div>}
+    <Btn onClick={()=>{setDone(null);setStep("list");}} variant="secondary">Voltar</Btn>
+  </div>;
+
+  if(step==="form") return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <button onClick={()=>setStep("list")} style={{background:"none",border:"none",color:"#7C8AAE",cursor:"pointer",textAlign:"left",fontSize:13}}>← Voltar</button>
+    <TextInput label="Placa do veículo *" value={placa} onChange={e=>setPlaca(e.target.value.toUpperCase())} placeholder="ABC1D23"/>
+    <div>
+      <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE",display:"block",marginBottom:8}}>Tipo de situação *</label>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {TIPOS.map(t=><button key={t.id} onClick={()=>setTipo(t.id)} style={{background:tipo===t.id?"#FFB02E":"#1C2333",color:tipo===t.id?"#1C2333":"#C8D2EC",border:`1px solid ${tipo===t.id?"#FFB02E":"#2C3550"}`,borderRadius:10,padding:"10px 12px",cursor:"pointer",fontSize:13,fontWeight:600,textAlign:"left"}}>
+          {t.id==="sinistro"?"⚠ ":""}{t.label}
+        </button>)}
+      </div>
+    </div>
+    <div>
+      <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE",display:"block",marginBottom:6}}>Descrição</label>
+      <textarea value={descricao} onChange={e=>setDescricao(e.target.value)} placeholder="Detalhe a situação..." rows={3}
+        style={{width:"100%",background:"transparent",border:"2px solid #2C3550",borderRadius:8,padding:10,color:"#fff",fontSize:13,outline:"none",resize:"none"}}/>
+    </div>
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+        <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE"}}>Fotos do veículo</label>
+        <span style={{fontSize:11,color:fotos.length>=MAX?"#C0392B":"#7C8AAE",fontWeight:700}}>{fotos.length}/{MAX}</span>
+      </div>
+      {fotos.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:8}}>
+        {fotos.map((src,i)=><div key={i} style={{position:"relative",borderRadius:8,overflow:"hidden",aspectRatio:"1"}}>
+          <img src={src} alt={`foto ${i+1}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+          <button onClick={()=>setFotos(prev=>prev.filter((_,j)=>j!==i))} style={{position:"absolute",top:4,right:4,background:"#C0392B",border:"none",borderRadius:"50%",width:20,height:20,color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          <div style={{position:"absolute",bottom:0,left:0,right:0,background:"#00000088",color:"#fff",textAlign:"center",fontSize:10,padding:2}}>{i+1}</div>
+        </div>)}
+        {fotos.length<MAX&&<label htmlFor="foto-input" style={{background:"#1C2333",border:"1px dashed #3D5A80",borderRadius:8,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",aspectRatio:"1"}}>
+          <span style={{fontSize:24}}>📷</span>
+          <span style={{fontSize:10,color:"#5C6889",marginTop:4}}>Adicionar</span>
+        </label>}
+      </div>}
+      {fotos.length===0&&<label htmlFor="foto-input" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#1C2333",border:"1px dashed #3D5A80",borderRadius:10,padding:12,cursor:"pointer",color:"#9DB0D6",fontSize:13}}>
+        📷 Tirar / anexar fotos (até {MAX})
+      </label>}
+      <input ref={fotoRef} type="file" accept="image/*" multiple onChange={handleFoto} className="hidden" id="foto-input" style={{display:"none"}}/>
+    </div>
+    {tipo==="sinistro"&&<div>
+      <label style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#D9A441",display:"block",marginBottom:6}}>Boletim de Ocorrência *</label>
+      <input ref={boRef} type="file" accept="image/*,application/pdf" onChange={handleBo} id="bo-input" style={{display:"none"}}/>
+      <label htmlFor="bo-input" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"#2A1F12",border:"1px dashed #D9A441",borderRadius:10,padding:12,cursor:"pointer",color:"#E8C77A",fontSize:13}}>
+        📄 {bo?`Anexado: ${bo.name}`:"Anexar Boletim de Ocorrência"}
+      </label>
+    </div>}
+    <Erro msg={erro}/>
+    <Btn onClick={handleSubmit} disabled={!placa||!tipo||(tipo==="sinistro"&&!bo)||submitting}>
+      {submitting?"⏳ Enviando...":"✉ Enviar solicitação"}
+    </Btn>
+  </div>;
+
+  return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <Btn onClick={()=>setStep("form")}>🔧 Nova solicitação de manutenção</Btn>
+    <div>
+      <p style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE",marginBottom:8}}>Minhas solicitações</p>
+      {minhas.length===0&&<p style={{color:"#5C6889",fontSize:13}}>Nenhuma solicitação enviada ainda.</p>}
+      {minhas.map(r=><div key={r.id} style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:10,padding:12,marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{color:"#fff",fontWeight:600,fontSize:14}}>{TIPOS.find(t=>t.id===r.tipo)?.label} — {r.placa}</div>
+          <div style={{color:"#7C8AAE",fontSize:12,marginTop:2}}>{fmtDateTime(r.criadoEm)}</div>
+        </div>
+        <Badge status={r.status}/>
+      </div>)}
+    </div>
+  </div>;
+}
+
+// ---------- Email Config ----------
+function EmailConfig(){
+  const [emails,setEmails]=useState([]); const [novo,setNovo]=useState(""); const [nomeNovo,setNomeNovo]=useState("");
+  const [erro,setErro]=useState(""); const [feedback,setFeedback]=useState(""); const [loading,setLoading]=useState(true);
+  useEffect(()=>{ loadEmails().then(e=>{setEmails(e);setLoading(false);}); },[]);
+  function validar(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()); }
+  async function handleAdd(){
+    setErro(""); const email=novo.trim().toLowerCase();
+    if(!email){setErro("Digite um e-mail.");return;}
+    if(!validar(email)){setErro("E-mail inválido.");return;}
+    if(emails.find(e=>e.email===email)){setErro("E-mail já cadastrado.");return;}
+    const lista=[...emails,{id:uid(),email,nome:nomeNovo.trim()||email,ativo:true,criadoEm:Date.now()}];
+    await saveEmails(lista); setEmails(lista); setNovo(""); setNomeNovo("");
+    setFeedback("✅ E-mail adicionado!"); setTimeout(()=>setFeedback(""),2500);
+  }
+  async function handleToggle(id){
+    const lista=emails.map(e=>e.id===id?{...e,ativo:!e.ativo}:e);
+    await saveEmails(lista); setEmails(lista);
+  }
+  async function handleRemover(id){
+    const lista=emails.filter(e=>e.id!==id);
+    await saveEmails(lista); setEmails(lista);
+    setFeedback("E-mail removido."); setTimeout(()=>setFeedback(""),2000);
+  }
+  if(loading) return <p style={{color:"#7C8AAE",textAlign:"center"}}>Carregando...</p>;
+  return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{background:"#1C233388",border:"1px solid #2C3550",borderRadius:12,padding:16,display:"flex",gap:12}}>
+      <span style={{fontSize:20}}>📧</span>
+      <div><p style={{color:"#fff",fontWeight:700,fontSize:14}}>E-mails de notificação</p>
+      <p style={{color:"#7C8AAE",fontSize:12,marginTop:4,lineHeight:1.5}}>Todos os e-mails ativos receberão as solicitações com PDF em anexo.</p></div>
+    </div>
+    <div style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:16,display:"flex",flexDirection:"column",gap:12}}>
+      <p style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE"}}>Adicionar destinatário</p>
+      <TextInput label="Nome (opcional)" value={nomeNovo} onChange={e=>setNomeNovo(e.target.value)} placeholder="Ex: Equipe de Manutenção"/>
+      <TextInput label="E-mail *" value={novo} onChange={e=>setNovo(e.target.value)} placeholder="email@empresa.com" type="email"/>
+      <Erro msg={erro}/>
+      <Btn onClick={handleAdd}>➕ Adicionar e-mail</Btn>
+    </div>
+    {feedback&&<div style={{background:"#2E7D3222",border:"1px solid #2E7D3255",color:"#81C784",borderRadius:8,padding:"10px 14px",fontSize:13}}>{feedback}</div>}
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+        <p style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE"}}>Destinatários</p>
+        <span style={{color:"#FFB02E",fontSize:11,fontWeight:700}}>{emails.filter(e=>e.ativo).length} ativo(s)</span>
+      </div>
+      {emails.length===0&&<div style={{background:"#1C2333",border:"1px dashed #2C3550",borderRadius:12,padding:32,textAlign:"center"}}>
+        <p style={{fontSize:24,marginBottom:8}}>📭</p>
+        <p style={{color:"#5C6889",fontSize:13}}>Nenhum e-mail cadastrado ainda.</p>
+      </div>}
+      {emails.map(e=><div key={e.id} style={{background:"#1C2333",border:`1px solid ${e.ativo?"#2C3550":"#2C355066"}`,borderRadius:12,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,opacity:e.ativo?1:0.55}}>
+        <div style={{minWidth:0}}>
+          <div style={{color:"#fff",fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.nome}</div>
+          {e.nome!==e.email&&<div style={{color:"#7C8AAE",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.email}</div>}
+          <div style={{fontSize:10,marginTop:2,color:e.ativo?"#2E7D32":"#7C8AAE"}}>{e.ativo?"● Ativo":"○ Pausado"}</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexShrink:0}}>
+          <button onClick={()=>handleToggle(e.id)} style={{padding:"4px 10px",borderRadius:999,fontSize:11,fontWeight:700,cursor:"pointer",background:e.ativo?"#2E7D3222":"#3D5A8022",color:e.ativo?"#81C784":"#7C8AAE",border:`1px solid ${e.ativo?"#2E7D3255":"#3D5A8055"}`}}>{e.ativo?"Ativo":"Pausado"}</button>
+          <button onClick={()=>handleRemover(e.id)} style={{width:32,height:32,borderRadius:8,background:"#C0392B22",border:"none",color:"#C0392B",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
+        </div>
+      </div>)}
+    </div>
+  </div>;
+}
+
+// ---------- Manager View ----------
+function ManagerView({records,onChange}){
+  const [aba,setAba]=useState("lista"); const [filtro,setFiltro]=useState("todos");
+  const [selected,setSelected]=useState(null); const [refreshing,setRefreshing]=useState(false);
+  const [pdfPreview,setPdfPreview]=useState(null);
+
+  useEffect(()=>{ const t=setInterval(()=>onChange(),30000); return()=>clearInterval(t); },[]);
+
+  async function handleRefresh(){ setRefreshing(true); await onChange(); setTimeout(()=>setRefreshing(false),600); }
+
+  const filtered=useMemo(()=>{
+    if(filtro==="todos") return records;
+    if(filtro==="sinistro") return records.filter(r=>r.tipo==="sinistro");
+    return records.filter(r=>r.status===filtro);
+  },[records,filtro]);
+
+  const kpis=useMemo(()=>{
+    const resp=records.filter(r=>r.respondidoEm);
+    return {
+      total:records.length,
+      tempoRespMs:resp.length?resp.reduce((a,r)=>a+(r.respondidoEm-r.enviadoEm),0)/resp.length:null,
+      substituidos:records.filter(r=>r.veiculoSubstituido===true).length,
+      sinistros:records.filter(r=>r.tipo==="sinistro").length,
+    };
+  },[records]);
+
+  async function updateRecord(rec,patch){
+    const next={...rec,...patch};
+    if(patch.status&&patch.status!==rec.status){
+      next.historico=[...rec.historico,{status:patch.status,em:Date.now()}];
+      if(!rec.respondidoEm&&patch.status!=="enviado") next.respondidoEm=Date.now();
+    }
+    try{ const r=await apiPatch(`/api/solicitacoes/${rec.id}`,patch); Object.assign(next,r); }
+    catch(e){ console.warn("Backend offline, salvando local:",e.message); }
+    await saveRecord(next); await onChange(); setSelected(next);
+  }
+
+  function gerarPDF(rec){
+    const tipoLabel=TIPOS.find(t=>t.id===rec.tipo)?.label||rec.tipo;
+    const s=STATUS[rec.status]||{label:rec.status,color:"#888"};
+    const fotosHtml=rec.fotos?.length?`<div class="section"><div class="section-title">Fotos (${rec.fotos.length})</div><div class="foto-grid">${rec.fotos.map((src,i)=>`<div class="foto-item"><img src="${src}" /><div class="foto-num">Foto ${i+1}</div></div>`).join("")}</div></div>`:`<div class="section"><div class="section-title">Fotos</div><p class="empty">Nenhuma foto.</p></div>`;
+    const histHtml=rec.historico?.map(h=>{const hs=STATUS[h.status];return`<div class="hist-item"><div class="hist-dot" style="background:${hs?.color||'#888'}"></div><div><div class="hist-label">${hs?.label||h.status}</div><div class="hist-date">${fmtDateTime(h.em)}</div></div></div>`;}).join("")||"<p class='empty'>Sem histórico.</p>";
+    const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><title>Solicitação ${rec.placa}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;background:#fff;padding:32px;font-size:13px}.header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #FFB02E;padding-bottom:16px;margin-bottom:24px}.logo{display:flex;align-items:center;gap:10px}.logo-box{width:40px;height:40px;background:#FFB02E;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px}.badge{padding:5px 14px;border-radius:999px;font-size:11px;font-weight:700;color:#fff;background:${s.color}}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}.field{background:#f5f7ff;border-radius:8px;padding:10px 14px}.field label{font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#7C8AAE;font-weight:600}.field p{font-size:13px;font-weight:600;color:#1a1a2e;margin-top:2px}.section{margin-bottom:20px}.section-title{font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:#7C8AAE;font-weight:700;margin-bottom:10px;border-bottom:1px solid #e8eaf6;padding-bottom:5px}.foto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.foto-item{border-radius:8px;overflow:hidden;border:1px solid #e0e4f0}.foto-item img{width:100%;height:140px;object-fit:cover;display:block}.foto-num{text-align:center;font-size:11px;color:#7C8AAE;padding:4px;background:#f5f7ff;font-weight:600}.hist-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f2fa}.hist-dot{width:10px;height:10px;border-radius:50%;margin-top:3px;flex-shrink:0}.hist-label{font-size:13px;font-weight:600}.hist-date{font-size:11px;color:#7C8AAE}.empty{color:#aaa;font-style:italic;font-size:12px}.footer{margin-top:32px;border-top:1px solid #e0e4f0;padding-top:12px;display:flex;justify-content:space-between;font-size:11px;color:#aaa}@media print{body{padding:20px}@page{margin:15mm}}</style><link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#FFB02E"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Frota Conecta"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+</head><body><div class="header"><div class="logo"><div class="logo-box">🚛</div><div><h1 style="font-size:18px;font-weight:800">Frota Conecta</h1><p style="font-size:11px;color:#7C8AAE">Solicitação de Manutenção</p></div></div><span class="badge">${s.label}</span></div><h2 style="font-size:22px;font-weight:800;margin-bottom:4px">${tipoLabel}</h2><p style="color:#7C8AAE;margin-bottom:24px">Placa ${rec.placa} · ID ${rec.id}</p><div class="grid2"><div class="field"><label>Motorista</label><p>${rec.motorista}</p></div><div class="field"><label>Placa</label><p>${rec.placa}</p></div><div class="field"><label>Data da solicitação</label><p>${fmtDateTime(rec.criadoEm)}</p></div><div class="field"><label>Respondido em</label><p>${fmtDateTime(rec.respondidoEm)}</p></div><div class="field"><label>Veículo substituído</label><p>${rec.veiculoSubstituido===true?"✔ Sim":rec.veiculoSubstituido===false?"✘ Não":"Não informado"}</p></div><div class="field"><label>Placa substituta</label><p>${rec.placaSubstituta||"—"}</p></div></div>${fotosHtml}<div class="section"><div class="section-title">Histórico</div>${histHtml}</div><div class="footer"><span>Frota Conecta — ${fmtDateTime(Date.now())}</span><span>ID: ${rec.id}</span></div>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body></html>`;
+    const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    setPdfPreview({url,nome:`solicitacao-${rec.placa}-${rec.id.slice(0,6)}.html`});
+  }
+
+  if(pdfPreview) return <div style={{display:"flex",flexDirection:"column",gap:12}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <button onClick={()=>{URL.revokeObjectURL(pdfPreview.url);setPdfPreview(null);}} style={{background:"none",border:"none",color:"#7C8AAE",cursor:"pointer",fontSize:13}}>← Fechar</button>
+      <a href={pdfPreview.url} download={pdfPreview.nome} style={{background:"#FFB02E",color:"#1C2333",padding:"8px 14px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none",display:"flex",alignItems:"center",gap:6}}>📥 Baixar / Imprimir</a>
+    </div>
+    <iframe src={pdfPreview.url} style={{width:"100%",height:"70vh",borderRadius:12,border:"1px solid #2C3550"}}/>
+    <p style={{color:"#5C6889",fontSize:11,textAlign:"center"}}>Toque em "Baixar / Imprimir" → Imprimir → Salvar como PDF</p>
+  </div>;
+
+  if(selected) return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:"#7C8AAE",cursor:"pointer",fontSize:13}}>← Voltar</button>
+      <button onClick={()=>gerarPDF(selected)} style={{background:"#FFB02E",color:"#1C2333",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>📄 Gerar PDF</button>
+    </div>
+    <div style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div><h3 style={{color:"#fff",fontSize:17,fontWeight:800}}>{TIPOS.find(t=>t.id===selected.tipo)?.label}</h3>
+        <p style={{color:"#7C8AAE",fontSize:13}}>{selected.placa} · {selected.motorista}</p></div>
+        <Badge status={selected.status}/>
+      </div>
+      {selected.descricao&&<p style={{color:"#C8D2EC",fontSize:13,marginTop:12}}>{selected.descricao}</p>}
+      {selected.fotos?.length>0&&<div style={{marginTop:12}}>
+        <p style={{color:"#7C8AAE",fontSize:11,marginBottom:8}}>{selected.fotos.length} foto(s)</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+          {selected.fotos.map((src,i)=><div key={i} style={{borderRadius:8,overflow:"hidden",aspectRatio:"1",position:"relative"}}>
+            <img src={src} alt={`foto ${i+1}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            <div style={{position:"absolute",bottom:0,left:0,right:0,background:"#00000088",color:"#fff",textAlign:"center",fontSize:10,padding:2}}>{i+1}</div>
+          </div>)}
+        </div>
+      </div>}
+    </div>
+    <div style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      {[["Criado",fmtDateTime(selected.criadoEm)],["Enviado",fmtDateTime(selected.enviadoEm)],["Respondido",fmtDateTime(selected.respondidoEm)],["Tempo resposta",selected.respondidoEm?fmtDuration(selected.respondidoEm-selected.enviadoEm):"—"]].map(([l,v])=><div key={l}>
+        <span style={{color:"#7C8AAE",fontSize:11}}>{l}</span>
+        <div style={{color:"#fff",fontSize:12,fontFamily:"monospace",marginTop:2}}>{v}</div>
+      </div>)}
+      {selected.placaSubstituta&&<div style={{gridColumn:"1/-1",background:"#FFB02E11",border:"1px solid #FFB02E44",borderRadius:8,padding:10}}>
+        <span style={{color:"#FFB02E",fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em"}}>Placa substituta</span>
+        <div style={{color:"#fff",fontFamily:"monospace",fontSize:18,fontWeight:800,letterSpacing:"0.1em",marginTop:2}}>{selected.placaSubstituta}</div>
+      </div>}
+    </div>
+    <div style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:16}}>
+      <p style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE",marginBottom:10}}>Atualizar status</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {Object.entries(STATUS).map(([k,v])=><button key={k} onClick={()=>updateRecord(selected,{status:k})} style={{padding:"6px 12px",borderRadius:999,fontSize:12,fontWeight:700,cursor:"pointer",background:selected.status===k?v.color:"transparent",color:selected.status===k?"#fff":v.color,border:`1px solid ${v.color}`}}>{v.label}</button>)}
+      </div>
+    </div>
+    <div style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:16}}>
+      <p style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE",marginBottom:10}}>Veículo substituído?</p>
+      <div style={{display:"flex",gap:8}}>
+        {[{v:true,l:"Sim"},{v:false,l:"Não"}].map(o=><button key={o.l} onClick={()=>updateRecord(selected,{veiculoSubstituido:o.v,placaSubstituta:o.v?selected.placaSubstituta:null})} style={{padding:"6px 16px",borderRadius:999,fontSize:12,fontWeight:700,cursor:"pointer",background:selected.veiculoSubstituido===o.v?"#3D5A80":"transparent",color:selected.veiculoSubstituido===o.v?"#fff":"#7C8AAE",border:"1px solid #3D5A80"}}>{o.l}</button>)}
+      </div>
+      {selected.veiculoSubstituido===true&&<div style={{marginTop:16,paddingTop:16,borderTop:"1px solid #2C3550"}}>
+        <p style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#FFB02E",marginBottom:8}}>Placa do veículo substituto</p>
+        <div style={{display:"flex",gap:8}}>
+          <input id="placa-sub" defaultValue={selected.placaSubstituta||""} placeholder="Ex: BCD2E34" maxLength={8}
+            onInput={e=>e.target.value=e.target.value.toUpperCase()}
+            style={{flex:1,background:"transparent",border:"none",borderBottom:"2px solid #FFB02E",paddingBottom:6,color:"#fff",fontSize:16,outline:"none",letterSpacing:"0.1em",fontFamily:"monospace"}}/>
+          <button onClick={()=>{const v=document.getElementById("placa-sub")?.value?.trim().toUpperCase();if(v)updateRecord(selected,{placaSubstituta:v});}} style={{background:"#FFB02E",color:"#1C2333",border:"none",borderRadius:8,padding:"6px 16px",fontWeight:700,cursor:"pointer",fontSize:13}}>Salvar</button>
+        </div>
+        {selected.placaSubstituta&&<p style={{color:"#81C784",fontSize:12,marginTop:8}}>✔ Registrado: <strong style={{fontFamily:"monospace"}}>{selected.placaSubstituta}</strong></p>}
+      </div>}
+    </div>
+    {selected.historico?.length>0&&<div style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:12,padding:16}}>
+      <p style={{fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:"#7C8AAE",marginBottom:12}}>Histórico de alterações</p>
+      {selected.historico.map((h,i)=>{
+        const s=STATUS[h.status]; const isLast=i===selected.historico.length-1;
+        return <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12,position:"relative"}}>
+          {!isLast&&<div style={{position:"absolute",left:6,top:16,width:2,height:"100%",background:"#2C3550"}}/>}
+          <div style={{width:14,height:14,borderRadius:"50%",background:s?.color||"#888",flexShrink:0,zIndex:1,marginTop:2}}/>
+          <div style={{paddingBottom:16}}>
+            <div style={{color:"#fff",fontSize:13,fontWeight:600}}>{s?.label||h.status}</div>
+            <div style={{color:"#7C8AAE",fontSize:11}}>{fmtDateTime(h.em)}</div>
+          </div>
+        </div>;
+      })}
+    </div>}
+  </div>;
+
+  return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{display:"flex",background:"#1C2333",borderRadius:10,padding:4}}>
+      {[{a:"lista",l:"📋 Solicitações"},{a:"config",l:"✉ E-mails"}].map(o=><button key={o.a} onClick={()=>setAba(o.a)} style={{flex:1,padding:"8px 0",borderRadius:8,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:aba===o.a?"#FFB02E":"transparent",color:aba===o.a?"#1C2333":"#7C8AAE"}}>{o.l}</button>)}
+    </div>
+    {aba==="config"&&<EmailConfig/>}
+    {aba==="lista"&&<>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><span style={{color:"#fff",fontWeight:800,fontSize:16}}>{records.length}</span><span style={{color:"#7C8AAE",fontSize:12,marginLeft:6}}>solicitações</span></div>
+        <button onClick={handleRefresh} style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:8,padding:"6px 12px",color:"#7C8AAE",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",gap:6}}>
+          <span style={{display:"inline-block",animation:refreshing?"spin 1s linear infinite":"none"}}>🔄</span> Atualizar
+        </button>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <KPI label="Tempo médio resposta" value={fmtDuration(kpis.tempoRespMs)}/>
+        <KPI label="Substituídos" value={`${kpis.substituidos}/${kpis.total}`}/>
+        <KPI label="Sinistros" value={kpis.sinistros}/>
+        <KPI label="Total" value={kpis.total}/>
+      </div>
+      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
+        {[{id:"todos",l:"Todos"},{id:"enviado",l:"Aguardando"},{id:"andamento",l:"Em andamento"},{id:"concluido",l:"Concluído"},{id:"sinistro",l:"Sinistros"}].map(f=><button key={f.id} onClick={()=>setFiltro(f.id)} style={{flexShrink:0,padding:"6px 12px",borderRadius:999,fontSize:12,fontWeight:700,cursor:"pointer",background:filtro===f.id?"#FFB02E":"transparent",color:filtro===f.id?"#1C2333":"#7C8AAE",border:`1px solid ${filtro===f.id?"#FFB02E":"#2C3550"}`}}>{f.l}</button>)}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {filtered.length===0&&<p style={{color:"#5C6889",fontSize:13,textAlign:"center",padding:"32px 0"}}>Nenhuma solicitação. Toque em Atualizar.</p>}
+        {filtered.map(r=><button key={r.id} onClick={()=>setSelected(r)} style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:10,padding:12,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",textAlign:"left",width:"100%"}}>
+          <div style={{minWidth:0}}>
+            <div style={{color:"#fff",fontWeight:600,fontSize:14}}>{r.tipo==="sinistro"?"⚠ ":""}{TIPOS.find(t=>t.id===r.tipo)?.label} — {r.placa}</div>
+            <div style={{color:"#7C8AAE",fontSize:12,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.motorista} · {fmtDateTime(r.criadoEm)}</div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <Badge status={r.status}/>
+            <span style={{color:"#5C6889"}}>›</span>
+          </div>
+        </button>)}
+      </div>
+    </>}
+  </div>;
+}
+
+// ---------- Root ----------
+function App(){
+  const [session,setSession]=useState(null);
+  const [users,setUsers]=useState([]);
+  const [records,setRecords]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [serverStatus,setServerStatus]=useState("checking");
+
+  async function pingServer(){
+    try{
+      await fetch(BACKEND_URL+"/",{method:"GET",mode:"no-cors"});
+      setServerStatus("online");
+    }catch{ setServerStatus("offline"); }
+  }
+  async function refresh(){
+    const [recs,usrs]=await Promise.all([loadAllRecords(),loadUsers()]);
+    setRecords(recs); setUsers(usrs);
+  }
+  useEffect(()=>{
+    pingServer();
+    refresh().finally(()=>setLoading(false));
+    const t=setInterval(pingServer,10*60*1000);
+    return()=>clearInterval(t);
+  },[]);
+
+  const statusDot={checking:{color:"#D9A441",label:"Conectando..."},online:{color:"#2E7D32",label:"Servidor online"},offline:{color:"#C0392B",label:"Servidor offline"}}[serverStatus];
+
+  return <div style={{minHeight:"100vh",background:"#10141F",display:"flex",justifyContent:"center"}}>
+    <div style={{width:"100%",maxWidth:480,display:"flex",flexDirection:"column",minHeight:"100vh"}}>
+      <header style={{padding:"24px 20px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,background:"#FFB02E",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🚛</div>
+          <div>
+            <h1 style={{color:"#fff",fontWeight:800,fontSize:16,lineHeight:1.2}}>Frota Conecta</h1>
+            <p style={{color:"#7C8AAE",fontSize:11}}>{session?(session.role==="gestor"?"Gestão de frota":`Olá, ${session.nome.split(" ")[0]}`):"Solicitação de manutenção"}</p>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:999,background:statusDot.color+"22",border:`1px solid ${statusDot.color}55`}}>
+            <span style={{width:6,height:6,borderRadius:"50%",background:statusDot.color,display:"inline-block"}}/>
+            <span style={{color:statusDot.color,fontSize:10,fontWeight:700}}>{statusDot.label}</span>
+          </div>
+          {session&&<button onClick={()=>setSession(null)} style={{background:"#1C2333",border:"1px solid #2C3550",borderRadius:8,padding:"6px 12px",color:"#7C8AAE",cursor:"pointer",fontSize:12}}>Sair</button>}
+        </div>
+      </header>
+      <main style={{padding:"0 20px 40px",flex:1}}>
+        {loading?<div style={{display:"flex",justifyContent:"center",paddingTop:80,color:"#7C8AAE",fontSize:24}}>⏳</div>
+        :!session?<LoginScreen onLogin={setSession} users={users}/>
+        :session.role==="motorista"?<DriverView user={session} records={records} onSubmitted={refresh}/>
+        :<ManagerView records={records} onChange={refresh}/>}
+      </main>
+    </div>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
