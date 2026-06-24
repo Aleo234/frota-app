@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
 <title>Frota Conecta</title>
-<link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkZyb3RhIENvbmVjdGEiLAogICJzaG9ydF9uYW1lIjogIkZyb3RhIENvbmVjdGEiLAogICJkZXNjcmlwdGlvbiI6ICJTb2xpY2l0YcOnw6NvIGRlIG1hbnV0ZW7Dp8OjbyBkZSBmcm90YSIsCiAgInN0YXJ0X3VybCI6ICIvZnJvdGEtYXBwLyIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzEwMTQxRiIsCiAgInRoZW1lX2NvbG9yIjogIiNGRkIwMkUiLAogICJvcmllbnRhdGlvbiI6ICJwb3J0cmFpdCIsCiAgImljb25zIjogWwogICAgeyJzcmMiOiAiaWNvbi0xOTIucG5nIiwgInNpemVzIjogIjE5MngxOTIiLCAidHlwZSI6ICJpbWFnZS9wbmciLCAicHVycG9zZSI6ICJhbnkgbWFza2FibGUifSwKICAgIHsic3JjIjogImljb24tNTEyLnBuZyIsICJzaXplcyI6ICI1MTJ4NTEyIiwgInR5cGUiOiAiaW1hZ2UvcG5nIiwgInB1cnBvc2UiOiAiYW55IG1hc2thYmxlIn0KICBdCn0="/>
+
 <meta name="theme-color" content="#FFB02E"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -1578,8 +1578,11 @@ async function init(){
 
 init();
 
+// Desregistrar service workers antigos
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister());
+  });
 }
 </script>
 </body>
