@@ -1,4 +1,4 @@
-const CACHE = 'frota-conecta-v9';
+const CACHE = 'frota-conecta-v10';
 const ASSETS = [
   '/frota-app/',
   '/frota-app/index.html',

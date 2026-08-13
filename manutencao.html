@@ -225,7 +225,8 @@ async function showHome(){
       <p style="color:#7C8AAE;font-size:12px">Logado como</p>
       <p style="font-weight:800;font-size:16px;margin-top:2px">${session.nome}</p>
     </div>
-    <button class="btn btn-primary" style="margin-bottom:16px" onclick="showFormSolicitacao()">🔧 Nova solicitação de manutenção</button>
+    <button class="btn btn-primary" style="margin-bottom:10px" onclick="showFormSolicitacao()">🔧 Nova solicitação de manutenção</button>
+    <button class="btn btn-ghost" style="margin-bottom:16px" onclick="showInspecoesSetor()">📋 Inspeção Periódica</button>
     <p style="color:#7C8AAE;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Minhas solicitações</p>
     <div>${renderLista(ordenado)}</div>
   `);
@@ -474,6 +475,148 @@ function showConfirmacao(r){
       ${emailBlock}
       <button class="btn btn-primary" style="margin-top:16px" onclick="showFormSolicitacao()">🔧 Nova solicitação</button>
       <button class="btn btn-ghost" style="margin-top:10px" onclick="showHome()">Ver minhas solicitações</button>
+    </div>
+  `);
+}
+
+// ===== INSPEÇÃO PERIÓDICA =====
+let inspecoesTmp = [];
+let inspFotosTmp = { km: null, frente: null, lateralDireita: null, lateralEsquerda: null, traseira: null };
+const CAMPOS_FOTO_INSPECAO = [
+  { campo: 'km', label: 'Foto do KM' },
+  { campo: 'frente', label: 'Foto Frente' },
+  { campo: 'lateralDireita', label: 'Foto Lateral Direita' },
+  { campo: 'lateralEsquerda', label: 'Foto Lateral Esquerda' },
+  { campo: 'traseira', label: 'Foto Traseira' },
+];
+
+async function showInspecoesSetor(){
+  render('<div class="text-center" style="padding-top:40px;color:#7C8AAE">Carregando...</div>');
+  try{ inspecoesTmp = await api("GET","/api/inspecoes"); }catch(e){ inspecoesTmp = []; }
+  const ordenado = [...inspecoesTmp].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
+  render(`
+    <button class="volta-btn" onclick="showHome()">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">📋 Inspeção Periódica</div>
+    <p style="color:#7C8AAE;font-size:12px;margin-bottom:14px">Registro mensal do estado do veículo: km e fotos de frente, traseira, laterais e do painel.</p>
+    <button class="btn btn-primary" style="margin-bottom:16px" onclick="showFormInspecaoSetor()">+ Nova inspeção</button>
+    <div>${renderListaInspecoesSetor(ordenado)}</div>
+  `);
+}
+
+function renderListaInspecoesSetor(lista){
+  if(!lista.length) return '<div class="card text-center" style="padding:24px"><p style="color:#5C6889">Nenhuma inspeção registrada ainda.</p></div>';
+  return lista.map(i=>`
+    <button class="sol-item" onclick="showDetalheInspecaoSetor('${i.id}')">
+      <div style="min-width:0;flex:1">
+        <div class="sol-title">📋 ${i.placa} — ${(i.km||0).toLocaleString('pt-BR')} km</div>
+        <div class="sol-sub">${i.criadoEm?new Date(i.criadoEm).toLocaleDateString('pt-BR'):'—'}</div>
+      </div>
+    </button>`).join('');
+}
+
+function renderSlotFotoInsp(campo, label){
+  const src = inspFotosTmp[campo];
+  return `
+    <div id="insp-slot-${campo}">
+      <label class="field-label">${label} *</label>
+      ${src ? `
+        <div style="position:relative;border-radius:10px;overflow:hidden;margin-bottom:16px;aspect-ratio:4/3">
+          <img src="${src}" style="width:100%;height:100%;object-fit:cover"/>
+          <button onclick="removeFotoInsp('${campo}')" style="position:absolute;top:8px;right:8px;background:#C0392B;border:none;border-radius:50%;width:28px;height:28px;color:#fff;cursor:pointer;font-size:16px;font-weight:700">×</button>
+        </div>
+      ` : `
+        <input type="file" accept="image/*" capture="environment" id="insp-input-${campo}" class="hidden" onchange="addFotoInsp('${campo}', this)"/>
+        <label for="insp-input-${campo}" class="foto-btn-vazio" style="margin-bottom:16px">📷 Tirar / escolher foto</label>
+      `}
+    </div>
+  `;
+}
+
+async function addFotoInsp(campo, input){
+  const file = input.files?.[0];
+  if(!file) return;
+  try{ inspFotosTmp[campo] = await compressImage(file); }catch(e){}
+  const slot = $(`insp-slot-${campo}`);
+  const label = CAMPOS_FOTO_INSPECAO.find(c=>c.campo===campo)?.label || '';
+  if(slot) slot.outerHTML = renderSlotFotoInsp(campo, label);
+}
+
+function removeFotoInsp(campo){
+  inspFotosTmp[campo] = null;
+  const slot = $(`insp-slot-${campo}`);
+  const label = CAMPOS_FOTO_INSPECAO.find(c=>c.campo===campo)?.label || '';
+  if(slot) slot.outerHTML = renderSlotFotoInsp(campo, label);
+}
+
+function showFormInspecaoSetor(){
+  inspFotosTmp = { km: null, frente: null, lateralDireita: null, lateralEsquerda: null, traseira: null };
+  render(`
+    <button class="volta-btn" onclick="showInspecoesSetor()">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">📋 Nova Inspeção Periódica</div>
+    <div class="card">
+      <label class="field-label">Placa *</label>
+      <input class="field-input" id="insp-placa" placeholder="ABC1D23" maxlength="8" oninput="this.value=this.value.toUpperCase()"/>
+
+      <label class="field-label">KM atual *</label>
+      <input class="field-input" id="insp-km" type="number" inputmode="numeric" placeholder="Ex: 45230"/>
+
+      ${CAMPOS_FOTO_INSPECAO.map(c=>renderSlotFotoInsp(c.campo, c.label)).join('')}
+
+      <div id="insp-erro"></div>
+      <button class="btn btn-primary" id="insp-btn" onclick="enviarInspecaoSetor()">📋 Registrar inspeção</button>
+    </div>
+  `);
+}
+
+async function enviarInspecaoSetor(){
+  const placa = $("insp-placa")?.value?.trim().toUpperCase();
+  const km = parseInt($("insp-km")?.value, 10);
+  if(!placa){ setErro("insp-erro","Informe a placa."); return; }
+  if(!km || km<0){ setErro("insp-erro","Informe o KM atual."); return; }
+  const faltando = CAMPOS_FOTO_INSPECAO.filter(c=>!inspFotosTmp[c.campo]);
+  if(faltando.length){ setErro("insp-erro",`Faltam fotos: ${faltando.map(c=>c.label).join(', ')}.`); return; }
+
+  const registro = {
+    id: uid(), placa, km,
+    fotoKm: inspFotosTmp.km,
+    fotoFrente: inspFotosTmp.frente,
+    fotoLateralDireita: inspFotosTmp.lateralDireita,
+    fotoLateralEsquerda: inspFotosTmp.lateralEsquerda,
+    fotoTraseira: inspFotosTmp.traseira,
+    criadoEm: Date.now()
+  };
+
+  const btn = $("insp-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    await api("POST","/api/inspecoes", registro);
+    showInspecoesSetor();
+  }catch(e){
+    setErro("insp-erro","Erro ao salvar: "+e.message);
+    btn.disabled = false; btn.innerHTML = '📋 Registrar inspeção';
+  }
+}
+
+function showDetalheInspecaoSetor(id){
+  const insp = inspecoesTmp.find(x=>x.id===id);
+  if(!insp) return;
+  render(`
+    <button class="volta-btn" onclick="showInspecoesSetor()">← Voltar</button>
+    <div class="card">
+      <div style="font-weight:800;font-size:17px">📋 ${insp.placa}</div>
+      <div style="color:#7C8AAE;font-size:13px;margin-top:2px">${(insp.km||0).toLocaleString('pt-BR')} km · ${insp.criadoEm?new Date(insp.criadoEm).toLocaleDateString('pt-BR'):'—'}</div>
+    </div>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${CAMPOS_FOTO_INSPECAO.map(c=>`
+          <div>
+            <div style="border-radius:10px;overflow:hidden;aspect-ratio:4/3;margin-bottom:4px">
+              <img src="${insp['foto'+c.campo.charAt(0).toUpperCase()+c.campo.slice(1)]}" style="width:100%;height:100%;object-fit:cover"/>
+            </div>
+            <p style="color:#7C8AAE;font-size:10px;text-align:center">${c.label}</p>
+          </div>
+        `).join('')}
+      </div>
     </div>
   `);
 }

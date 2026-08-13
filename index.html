@@ -234,6 +234,23 @@ async function excluirSetorApi(id){
   return await api("DELETE",`/api/setores/${id}`);
 }
 
+// ===== INSPEÇÃO PERIÓDICA =====
+let inspecoes = [];
+let inspFotosTmp = { km: null, frente: null, lateralDireita: null, lateralEsquerda: null, traseira: null };
+
+async function loadInspecoes(){
+  return await api("GET","/api/inspecoes");
+}
+async function salvarInspecao(insp){
+  return await api("POST","/api/inspecoes",insp);
+}
+async function atualizarInspecao(id, patch){
+  return await api("PATCH",`/api/inspecoes/${id}`,patch);
+}
+async function excluirInspecaoApi(id){
+  return await api("DELETE",`/api/inspecoes/${id}`);
+}
+
 // ===== E-MAIL DE NOTIFICAÇÃO DE MANUTENÇÃO =====
 async function loadConfigEmailManutencao(){
   return await api("GET","/api/config-email-manutencao");
@@ -2450,7 +2467,8 @@ async function renderManutencoes(){
       <button id="mn-tab-concluido" onclick="mudarFiltroManutencao('concluido')" style="${tabStyle('concluido')}">Concluídas</button>
       <button id="mn-tab-todas" onclick="mudarFiltroManutencao('todas')" style="${tabStyle('todas')}">Todas</button>
     </div>
-    <button onclick="showRelatorioManutencoes()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #2E86D9;background:#2E86D911;color:#2E86D9;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:${session.role==='gestor'?'8px':'14px'}">📄 Relatório de manutenções</button>
+    <button onclick="showRelatorioManutencoes()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #2E86D9;background:#2E86D911;color:#2E86D9;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:8px">📄 Relatório de manutenções</button>
+    <button onclick="showInspecoes()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #00C2A8;background:#00C2A811;color:#5EEAD4;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:8px">📋 Inspeção Periódica</button>
     ${session.role==='gestor'?`<button onclick="showConfigEmailManutencao()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #2C3550;background:transparent;color:#7C8AAE;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:14px">✉️ E-mail de notificação</button>`:''}
     <div id="mn-lista">${renderListaManutencoes(lista)}</div>
   `;
@@ -2982,6 +3000,244 @@ function gerarRelatorioManutencoesCSV(){
   const csv = '\uFEFF'+[header.map(csvEscapeManut).join(';'), ...linhas].join('\r\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='relatorio-manutencoes.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ===================== INSPEÇÃO PERIÓDICA =====================
+const CAMPOS_FOTO_INSPECAO = [
+  { campo: 'km', label: 'Foto do KM' },
+  { campo: 'frente', label: 'Foto Frente' },
+  { campo: 'lateralDireita', label: 'Foto Lateral Direita' },
+  { campo: 'lateralEsquerda', label: 'Foto Lateral Esquerda' },
+  { campo: 'traseira', label: 'Foto Traseira' },
+];
+
+async function showInspecoes(){
+  render('<div style="text-align:center;padding:40px 0"><span style="color:#7C8AAE">Carregando...</span></div>');
+  inspecoes = await loadInspecoes().catch(()=>[]);
+  const ordenado = [...inspecoes].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
+  render(`
+    <button class="volta-btn" onclick="showGestor('manutencoes')">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">📋 Inspeção Periódica</div>
+    <p style="color:#7C8AAE;font-size:12px;margin-bottom:14px">Registro mensal do estado dos veículos: km e fotos de frente, traseira, laterais e do painel.</p>
+    <button class="btn btn-primary" style="margin-bottom:10px" onclick="showFormInspecao()">+ Nova inspeção</button>
+    <button onclick="showRelatorioInspecoes()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #00C2A8;background:#00C2A811;color:#5EEAD4;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:14px">📄 Relatório de inspeções</button>
+    <div>${renderListaInspecoes(ordenado)}</div>
+  `);
+}
+
+function renderListaInspecoes(lista){
+  if(!lista.length) return '<div class="card" style="text-align:center;padding:32px"><p style="font-size:32px;margin-bottom:8px">📋</p><p style="color:#5C6889">Nenhuma inspeção registrada ainda.</p></div>';
+  return lista.map(i=>`
+    <button class="sol-item" onclick="showDetalheInspecao('${i.id}')" style="border-left:3px solid #00C2A8">
+      <div style="min-width:0;flex:1">
+        <div class="sol-title">📋 ${i.placa} — ${(i.km||0).toLocaleString('pt-BR')} km</div>
+        <div class="sol-sub">${i.criadoEm?new Date(i.criadoEm).toLocaleDateString('pt-BR'):'—'} · ${i.registradoPor||'—'}</div>
+      </div>
+    </button>`).join('');
+}
+
+function renderSlotFotoInsp(campo, label){
+  const src = inspFotosTmp[campo];
+  return `
+    <div id="insp-slot-${campo}">
+      <label class="field-label">${label} *</label>
+      ${src ? `
+        <div style="position:relative;border-radius:10px;overflow:hidden;margin-bottom:12px;aspect-ratio:4/3">
+          <img src="${src}" style="width:100%;height:100%;object-fit:cover"/>
+          <button onclick="removeFotoInsp('${campo}')" style="position:absolute;top:8px;right:8px;background:#C0392B;border:none;border-radius:50%;width:28px;height:28px;color:#fff;cursor:pointer;font-size:16px;font-weight:700">×</button>
+        </div>
+      ` : `
+        <input type="file" accept="image/*" capture="environment" id="insp-input-${campo}" class="hidden" onchange="addFotoInsp('${campo}', this)"/>
+        <label for="insp-input-${campo}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #00C2A8;border-radius:10px;padding:18px;cursor:pointer;color:#5EEAD4;font-size:13px;margin-bottom:12px">
+          📷 Tirar / escolher foto
+        </label>
+      `}
+    </div>
+  `;
+}
+
+async function addFotoInsp(campo, input){
+  const file = input.files?.[0];
+  if(!file) return;
+  try{
+    inspFotosTmp[campo] = await compressImage(file);
+  }catch(e){}
+  const slot = $(`insp-slot-${campo}`);
+  const label = CAMPOS_FOTO_INSPECAO.find(c=>c.campo===campo)?.label || '';
+  if(slot) slot.outerHTML = renderSlotFotoInsp(campo, label);
+}
+
+function removeFotoInsp(campo){
+  inspFotosTmp[campo] = null;
+  const slot = $(`insp-slot-${campo}`);
+  const label = CAMPOS_FOTO_INSPECAO.find(c=>c.campo===campo)?.label || '';
+  if(slot) slot.outerHTML = renderSlotFotoInsp(campo, label);
+}
+
+async function showFormInspecao(){
+  inspFotosTmp = { km: null, frente: null, lateralDireita: null, lateralEsquerda: null, traseira: null };
+  render(`
+    <button class="volta-btn" onclick="showInspecoes()">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">📋 Nova Inspeção Periódica</div>
+    <div class="card">
+      <label class="field-label">Placa *</label>
+      <input class="field-input" id="insp-placa" placeholder="ABC1D23" maxlength="8" oninput="this.value=this.value.toUpperCase()"/>
+
+      <label class="field-label">KM atual *</label>
+      <input class="field-input" id="insp-km" type="number" inputmode="numeric" placeholder="Ex: 45230"/>
+
+      ${CAMPOS_FOTO_INSPECAO.map(c=>renderSlotFotoInsp(c.campo, c.label)).join('')}
+
+      <div id="insp-erro" style="margin-top:8px"></div>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="salvarInspecaoForm()">📋 Registrar inspeção</button>
+    </div>
+  `);
+}
+
+async function salvarInspecaoForm(){
+  const placa = $("insp-placa")?.value?.trim().toUpperCase();
+  const km = parseInt($("insp-km")?.value, 10);
+  if(!placa){ setErro("insp-erro","Informe a placa."); return; }
+  if(!km || km<0){ setErro("insp-erro","Informe o KM atual."); return; }
+  const faltando = CAMPOS_FOTO_INSPECAO.filter(c=>!inspFotosTmp[c.campo]);
+  if(faltando.length){ setErro("insp-erro",`Faltam fotos: ${faltando.map(c=>c.label).join(', ')}.`); return; }
+
+  const registro = {
+    id: uid(),
+    placa, km,
+    fotoKm: inspFotosTmp.km,
+    fotoFrente: inspFotosTmp.frente,
+    fotoLateralDireita: inspFotosTmp.lateralDireita,
+    fotoLateralEsquerda: inspFotosTmp.lateralEsquerda,
+    fotoTraseira: inspFotosTmp.traseira,
+    registradoPor: session?.nome || session?.usuario || '—',
+    criadoEm: Date.now()
+  };
+
+  try{
+    const salvo = await salvarInspecao(registro);
+    inspecoes.unshift(salvo);
+    showInspecoes();
+  }catch(e){ setErro("insp-erro","Erro ao salvar: "+e.message); }
+}
+
+function showDetalheInspecao(id){
+  const insp = inspecoes.find(x=>x.id===id);
+  if(!insp) return;
+  render(`
+    <button class="volta-btn" onclick="showInspecoes()">← Voltar</button>
+    <div class="card">
+      <div style="font-weight:800;font-size:17px">📋 ${insp.placa}</div>
+      <div style="color:#7C8AAE;font-size:13px;margin-top:2px">${(insp.km||0).toLocaleString('pt-BR')} km · ${insp.criadoEm?new Date(insp.criadoEm).toLocaleDateString('pt-BR'):'—'}</div>
+      <div style="color:#7C8AAE;font-size:12px;margin-top:4px">Registrado por ${insp.registradoPor||'—'}</div>
+    </div>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${CAMPOS_FOTO_INSPECAO.map(c=>`
+          <div>
+            <div style="border-radius:10px;overflow:hidden;aspect-ratio:4/3;margin-bottom:4px">
+              <img src="${insp['foto'+c.campo.charAt(0).toUpperCase()+c.campo.slice(1)]}" style="width:100%;height:100%;object-fit:cover"/>
+            </div>
+            <p style="color:#7C8AAE;font-size:10px;text-align:center">${c.label}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <button onclick="excluirInspecaoConfirm('${id}')" style="width:100%;padding:10px;border-radius:8px;border:1px solid #C0392B;background:#C0392B11;color:#FF9B8A;cursor:pointer;font-size:12px;font-weight:700">✕ Excluir</button>
+  `);
+}
+
+async function excluirInspecaoConfirm(id){
+  const insp = inspecoes.find(x=>x.id===id);
+  if(!confirm(`Excluir a inspeção da placa ${insp?.placa||''}? Essa ação não pode ser desfeita.`)) return;
+  try{
+    await excluirInspecaoApi(id);
+    inspecoes = inspecoes.filter(x=>x.id!==id);
+    showInspecoes();
+  }catch(e){ alert("Erro ao excluir: "+e.message); }
+}
+
+function showRelatorioInspecoes(){
+  const placas = [...new Set(inspecoes.map(i=>i.placa))].filter(Boolean).sort();
+  const hoje = new Date().toISOString().slice(0,10);
+  const inicioMes = new Date(); inicioMes.setDate(1);
+  render(`
+    <button class="volta-btn" onclick="showInspecoes()">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">📄 Relatório de Inspeções</div>
+    <div class="card">
+      <label class="field-label">Veículo</label>
+      <select id="insp-rp-placa" class="field-select" style="width:100%;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:10px;color:#fff;font-size:14px;outline:none">
+        <option value="">Todos os veículos</option>
+        ${placas.map(p=>`<option value="${p}">${p}</option>`).join('')}
+      </select>
+
+      <label class="field-label">Data inicial</label>
+      <input type="date" class="field-input" id="insp-rp-ini" value="${inicioMes.toISOString().slice(0,10)}"/>
+      <label class="field-label">Data final</label>
+      <input type="date" class="field-input" id="insp-rp-fim" value="${hoje}"/>
+
+      <div id="insp-rp-erro" style="margin-top:8px"></div>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="gerarRelatorioInspecoesPDF()">📄 Gerar relatório PDF</button>
+    </div>
+  `);
+}
+
+function gerarRelatorioInspecoesPDF(){
+  const placa = $("insp-rp-placa")?.value||'';
+  const ini = $("insp-rp-ini")?.value;
+  const fim = $("insp-rp-fim")?.value;
+
+  let lista = [...inspecoes];
+  if(placa) lista = lista.filter(i=>i.placa===placa);
+  if(ini) lista = lista.filter(i=>i.criadoEm>=new Date(ini).getTime());
+  if(fim) lista = lista.filter(i=>i.criadoEm<=new Date(fim).getTime()+86399999);
+
+  if(!lista.length){ setErro("insp-rp-erro","Nenhuma inspeção encontrada com esses filtros."); return; }
+  setErro("insp-rp-erro","");
+  lista.sort((a,b)=>(a.placa||'').localeCompare(b.placa||'') || (b.criadoEm||0)-(a.criadoEm||0));
+
+  const paginas = lista.map(insp => `
+    <div class="pagina">
+      <div class="cabecalho">
+        <h1>📋 ${insp.placa}</h1>
+        <div class="meta">
+          <span><b>KM:</b> ${(insp.km||0).toLocaleString('pt-BR')}</span>
+          <span><b>Data:</b> ${insp.criadoEm?new Date(insp.criadoEm).toLocaleDateString('pt-BR'):'—'}</span>
+          <span><b>Registrado por:</b> ${insp.registradoPor||'—'}</span>
+        </div>
+      </div>
+      <div class="grid-fotos">
+        <div class="foto-box"><img src="${insp.fotoFrente}"/><p>Frente</p></div>
+        <div class="foto-box"><img src="${insp.fotoTraseira}"/><p>Traseira</p></div>
+        <div class="foto-box"><img src="${insp.fotoLateralDireita}"/><p>Lateral Direita</p></div>
+        <div class="foto-box"><img src="${insp.fotoLateralEsquerda}"/><p>Lateral Esquerda</p></div>
+        <div class="foto-box foto-km"><img src="${insp.fotoKm}"/><p>KM (${(insp.km||0).toLocaleString('pt-BR')})</p></div>
+      </div>
+    </div>
+  `).join("");
+
+  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><title>Relatório de Inspeções</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;color:#1a1a2e}
+    .pagina{padding:16mm 14mm;page-break-after:always}
+    .pagina:last-child{page-break-after:auto}
+    .cabecalho{border-bottom:3px solid #00A896;padding-bottom:10px;margin-bottom:18px}
+    .cabecalho h1{font-size:22px;color:#00A896;margin:0 0 8px 0}
+    .meta{display:flex;gap:24px;font-size:12px;color:#555}
+    .grid-fotos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .foto-box{border:1px solid #ddd;border-radius:8px;overflow:hidden}
+    .foto-box img{width:100%;height:260px;object-fit:cover;display:block}
+    .foto-box p{margin:0;padding:8px;text-align:center;font-size:12px;font-weight:bold;background:#f5f7ff;color:#333}
+    .foto-km{grid-column:span 2}
+    .foto-km img{height:220px;object-fit:contain;background:#111}
+    @media print{@page{margin:0}}
+  </style>
+  </head><body>
+  ${paginas}
+  <script>window.onload=()=>window.print();<\/script></body></html>`;
+  const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="relatorio-inspecoes.html";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
