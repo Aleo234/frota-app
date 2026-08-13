@@ -3177,12 +3177,15 @@ function showRelatorioInspecoes(){
       <input type="date" class="field-input" id="insp-rp-fim" value="${hoje}"/>
 
       <div id="insp-rp-erro" style="margin-top:8px"></div>
-      <button class="btn btn-primary" style="margin-top:14px" onclick="gerarRelatorioInspecoesPDF()">📄 Gerar relatório PDF</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+        <button class="btn btn-primary" style="margin:0" onclick="gerarRelatorioInspecoesPDF()">📄 Gerar PDF</button>
+        <button onclick="gerarRelatorioInspecoesCSV()" style="padding:10px;border-radius:8px;border:1px solid #00C2A8;background:#00C2A811;color:#5EEAD4;cursor:pointer;font-size:13px;font-weight:700">📥 Exportar CSV</button>
+      </div>
     </div>
   `);
 }
 
-function gerarRelatorioInspecoesPDF(){
+function filtrarInspecoesRelatorio(){
   const placa = $("insp-rp-placa")?.value||'';
   const ini = $("insp-rp-ini")?.value;
   const fim = $("insp-rp-fim")?.value;
@@ -3192,9 +3195,58 @@ function gerarRelatorioInspecoesPDF(){
   if(ini) lista = lista.filter(i=>i.criadoEm>=new Date(ini).getTime());
   if(fim) lista = lista.filter(i=>i.criadoEm<=new Date(fim).getTime()+86399999);
 
-  if(!lista.length){ setErro("insp-rp-erro","Nenhuma inspeção encontrada com esses filtros."); return; }
+  if(!lista.length){ setErro("insp-rp-erro","Nenhuma inspeção encontrada com esses filtros."); return null; }
   setErro("insp-rp-erro","");
   lista.sort((a,b)=>(a.placa||'').localeCompare(b.placa||'') || (b.criadoEm||0)-(a.criadoEm||0));
+  return lista;
+}
+
+function csvEscapeInsp(v){
+  const s = String(v??'').replace(/"/g,'""');
+  return /[;"\n]/.test(s) ? `"${s}"` : s;
+}
+
+function gerarRelatorioInspecoesCSV(){
+  const lista = filtrarInspecoesRelatorio();
+  if(!lista) return;
+  const header = ['Data do envio','Placa','Setor','KM'];
+  const linhas = lista.map(i=>[
+    i.criadoEm?new Date(i.criadoEm).toLocaleDateString('pt-BR'):'',
+    i.placa||'',
+    i.registradoPor||'',
+    i.km||0
+  ].map(csvEscapeInsp).join(';'));
+  const csv = '\uFEFF'+[header.map(csvEscapeInsp).join(';'), ...linhas].join('\r\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='relatorio-inspecoes.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function gerarRelatorioInspecoesPDF(){
+  const lista = filtrarInspecoesRelatorio();
+  if(!lista) return;
+
+  const linhasTabela = lista.map(insp => `
+    <tr>
+      <td>${insp.criadoEm?new Date(insp.criadoEm).toLocaleDateString('pt-BR'):'—'}</td>
+      <td>${insp.placa||'—'}</td>
+      <td>${insp.registradoPor||'—'}</td>
+      <td>${(insp.km||0).toLocaleString('pt-BR')}</td>
+    </tr>
+  `).join("");
+
+  const paginaResumo = `
+    <div class="pagina">
+      <div class="cabecalho">
+        <h1>📋 Relatório de Inspeções — Resumo</h1>
+        <div class="meta"><span>${lista.length} inspeção(ões) encontrada(s)</span></div>
+      </div>
+      <table class="tabela-resumo">
+        <thead><tr><th>Data do envio</th><th>Placa</th><th>Setor</th><th>KM</th></tr></thead>
+        <tbody>${linhasTabela}</tbody>
+      </table>
+    </div>
+  `;
 
   const paginas = lista.map(insp => `
     <div class="pagina">
@@ -3230,9 +3282,14 @@ function gerarRelatorioInspecoesPDF(){
     .foto-box p{margin:0;padding:8px;text-align:center;font-size:12px;font-weight:bold;background:#f5f7ff;color:#333}
     .foto-km{grid-column:span 2}
     .foto-km img{height:220px;object-fit:contain;background:#111}
+    .tabela-resumo{width:100%;border-collapse:collapse;margin-top:8px}
+    .tabela-resumo th{background:#00A896;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase}
+    .tabela-resumo td{padding:7px 10px;border-bottom:1px solid #e0e4f0;font-size:12px}
+    .tabela-resumo tr:nth-child(even){background:#f5f9ff}
     @media print{@page{margin:0}}
   </style>
   </head><body>
+  ${paginaResumo}
   ${paginas}
   <script>window.onload=()=>window.print();<\/script></body></html>`;
   const blob=new Blob([html],{type:"text/html;charset=utf-8"});
