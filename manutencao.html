@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Solicitação de Manutenção</title>
+
+<meta name="theme-color" content="#2E86D9"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Manutenção"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="manifest" href="manifest-manutencao.json"/>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#10141F;color:#fff;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh}
+input,textarea,button,select{font-family:inherit}
+.app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.header{padding:20px 20px 14px;display:flex;justify-content:space-between;align-items:center}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-box{width:36px;height:36px;background:#194C7D;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;overflow:hidden}
+.logo-box img{width:100%;height:100%;object-fit:cover}
+.logo-text h1{color:#fff;font-size:16px;font-weight:800}
+.logo-text p{color:#7C8AAE;font-size:11px}
+.btn-sair{background:#1C2333;border:1px solid #2C3550;border-radius:8px;padding:6px 12px;color:#7C8AAE;cursor:pointer;font-size:12px}
+.main{padding:0 20px 40px;flex:1}
+.card{background:#1C2333;border:1px solid #2C3550;border-radius:12px;padding:16px;margin-bottom:12px}
+.btn{width:100%;border-radius:12px;padding:14px;font-weight:700;font-size:15px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:#2E86D9;color:#1C2333}
+.btn-ghost{background:transparent;color:#7C8AAE;border:1px solid #2C3550}
+.tabs{display:flex;background:#1C2333;border-radius:10px;padding:4px;margin-bottom:16px}
+.tab{flex:1;padding:8px 0;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-size:13px;transition:all .2s;background:transparent;color:#7C8AAE}
+.tab.active{background:#2E86D9;color:#1C2333}
+.field-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#7C8AAE;display:block;margin-bottom:6px}
+.field-input{width:100%;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:10px;color:#fff;font-size:15px;outline:none;margin-bottom:16px}
+.field-input::placeholder{color:#5C6889}
+.field-textarea{width:100%;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:10px;color:#fff;font-size:13px;outline:none;resize:none;margin-bottom:16px}
+.foto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.foto-item{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1}
+.foto-item img{width:100%;height:100%;object-fit:cover}
+.foto-del{position:absolute;top:4px;right:4px;background:#C0392B;border:none;border-radius:50%;width:22px;height:22px;color:#fff;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.foto-num{position:absolute;bottom:0;left:0;right:0;background:#00000088;color:#fff;text-align:center;font-size:10px;padding:2px}
+.foto-btn-vazio{display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px;width:100%}
+.erro{background:#C0392B22;border:1px solid #C0392B55;color:#FF9B8A;border-radius:8px;padding:10px 14px;font-size:13px;display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
+.success{background:#2E7D3222;border:1px solid #2E7D3255;color:#81C784;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.sol-item{background:#1C2333;border:1px solid #2C3550;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;width:100%;text-align:left}
+.sol-title{color:#fff;font-weight:600;font-size:14px}
+.sol-sub{color:#7C8AAE;font-size:12px;margin-top:2px}
+.volta-btn{background:none;border:none;color:#7C8AAE;cursor:pointer;font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.data-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.data-item label{color:#7C8AAE;font-size:11px;display:block}
+.data-item p{color:#fff;font-size:12px;margin-top:2px}
+.success-icon{width:64px;height:64px;background:#2E7D3222;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px}
+.text-center{text-align:center}
+.hidden{display:none!important}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-box">🔧</div>
+      <div class="logo-text">
+        <h1>Manutenção</h1>
+        <p>Solicitação direta</p>
+      </div>
+    </div>
+    <button class="btn-sair hidden" id="btn-sair" onclick="logout()">Sair</button>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+const BACKEND = "https://frota-conecta-backend.onrender.com";
+let session = null, sessionToken = null;
+let servicosTmp = [], fotosTmp = [], pdfsTmp = [];
+const MAX_PDFS = 3;
+const MAX_PDF_MB = 4;
+
+function $(id){ return document.getElementById(id); }
+function render(html){ $("main").innerHTML = html; }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function setErro(id,msg){ $(id).innerHTML = msg?`<div class="erro">⚠ ${msg}</div>`:''; }
+function fmtData(ts){ return ts ? new Date(ts).toLocaleDateString("pt-BR") : "—"; }
+
+async function api(method, path, body){
+  const headers = {"Content-Type":"application/json"};
+  if(sessionToken) headers["Authorization"] = "Bearer "+sessionToken;
+  const res = await fetch(BACKEND+path, {
+    method, headers,
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(90000)
+  });
+  if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.error||`Erro ${res.status}`); }
+  return res.json();
+}
+
+function compressImage(file){ return new Promise((res,rej)=>{
+  const r=new FileReader();
+  r.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const s=Math.min(1,700/img.width);
+      const c=document.createElement("canvas");
+      c.width=img.width*s; c.height=img.height*s;
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL("image/jpeg",.6));
+    };
+    img.onerror=rej; img.src=e.target.result;
+  };
+  r.onerror=rej; r.readAsDataURL(file);
+});}
+
+// ===== SESSÃO =====
+function salvarSessao(){
+  try{ localStorage.setItem("mn_session", JSON.stringify({session, sessionToken})); }catch(e){}
+}
+function carregarSessao(){
+  try{
+    const s = JSON.parse(localStorage.getItem("mn_session")||"null");
+    if(s?.session && s?.sessionToken){ session = s.session; sessionToken = s.sessionToken; return true; }
+  }catch(e){}
+  return false;
+}
+function logout(){
+  session = null; sessionToken = null;
+  try{ localStorage.removeItem("mn_session"); }catch(e){}
+  $("btn-sair").classList.add("hidden");
+  showLogin();
+}
+
+// ===== LOGIN =====
+function showLogin(){
+  $("btn-sair").classList.add("hidden");
+  window._mnAba = window._mnAba || 'entrar';
+  render(`
+    <div class="tabs">
+      <button class="tab ${window._mnAba==='entrar'?'active':''}" onclick="mudarAbaLogin('entrar')">Entrar</button>
+      <button class="tab ${window._mnAba==='criar'?'active':''}" onclick="mudarAbaLogin('criar')">Criar acesso</button>
+    </div>
+    <div class="card">
+      <label class="field-label">Nome do setor/gabinete *</label>
+      <input class="field-input" id="ln-nome" placeholder="Ex: Gabinete Dep. Fulano"/>
+      ${window._mnAba==='criar'?`
+        <label class="field-label">E-mail do setor/gabinete *</label>
+        <input class="field-input" id="ln-email" type="email" placeholder="gabinete@alero.gov.br"/>
+      `:''}
+      <label class="field-label">PIN *</label>
+      <input class="field-input" id="ln-pin" type="password" inputmode="numeric" placeholder="••••"/>
+      ${window._mnAba==='criar'?`
+        <label class="field-label">Confirmar PIN *</label>
+        <input class="field-input" id="ln-pin2" type="password" inputmode="numeric" placeholder="••••"/>
+        <label class="field-label">Código de acesso *</label>
+        <input class="field-input" id="ln-codigo" placeholder="Fornecido pela ALE/RO"/>
+      `:''}
+      <div id="ln-erro"></div>
+      <button class="btn btn-primary" id="ln-btn" onclick="${window._mnAba==='criar'?'criarConta()':'entrar()'}">
+        ${window._mnAba==='criar'?'Criar acesso':'Entrar'}
+      </button>
+    </div>
+  `);
+}
+
+function mudarAbaLogin(aba){
+  window._mnAba = aba;
+  showLogin();
+}
+
+async function entrar(){
+  const nome = $("ln-nome")?.value?.trim();
+  const pin = $("ln-pin")?.value;
+  if(!nome||!pin){ setErro("ln-erro","Preencha nome e PIN."); return; }
+  const btn = $("ln-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    const r = await api("POST","/api/usuarios/login", { role:"setor", nome, pin });
+    session = r; sessionToken = r.token;
+    salvarSessao();
+    $("btn-sair").classList.remove("hidden");
+    showHome();
+  }catch(e){
+    setErro("ln-erro", e.message);
+    btn.disabled = false; btn.textContent = "Entrar";
+  }
+}
+
+async function criarConta(){
+  const nome = $("ln-nome")?.value?.trim();
+  const email = $("ln-email")?.value?.trim();
+  const pin = $("ln-pin")?.value;
+  const pin2 = $("ln-pin2")?.value;
+  const codigo = $("ln-codigo")?.value?.trim();
+  if(!nome||!email||!pin||!pin2||!codigo){ setErro("ln-erro","Preencha todos os campos."); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ setErro("ln-erro","Informe um e-mail válido."); return; }
+  if(pin.length<4){ setErro("ln-erro","O PIN deve ter pelo menos 4 dígitos."); return; }
+  if(pin!==pin2){ setErro("ln-erro","Os PINs não conferem."); return; }
+  const btn = $("ln-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    const r = await api("POST","/api/usuarios", { id: uid(), role:"setor", nome, email, pin, codigo, criadoEm: Date.now() });
+    session = r; sessionToken = r.token;
+    salvarSessao();
+    $("btn-sair").classList.remove("hidden");
+    showHome();
+  }catch(e){
+    setErro("ln-erro", e.message);
+    btn.disabled = false; btn.textContent = "Criar acesso";
+  }
+}
+
+// ===== HOME =====
+async function showHome(){
+  render('<div class="text-center" style="padding-top:40px;color:#7C8AAE">Carregando...</div>');
+  let lista = [];
+  try{ lista = await api("GET","/api/manutencoes"); }catch(e){}
+  const ordenado = [...lista].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
+  render(`
+    <div class="card text-center" style="padding:20px">
+      <p style="color:#7C8AAE;font-size:12px">Logado como</p>
+      <p style="font-weight:800;font-size:16px;margin-top:2px">${session.nome}</p>
+    </div>
+    <button class="btn btn-primary" style="margin-bottom:10px" onclick="showFormSolicitacao()">🔧 Nova solicitação de manutenção</button>
+    <button class="btn btn-ghost" style="margin-bottom:16px" onclick="showInspecoesSetor()">📋 Inspeção Periódica</button>
+    <p style="color:#7C8AAE;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Minhas solicitações</p>
+    <div>${renderLista(ordenado)}</div>
+  `);
+}
+
+function badgeStatus(status){
+  if(status==='concluido') return `<span class="badge" style="background:#2E7D3222;color:#81C784;border:1px solid #2E7D3255"><span class="dot" style="background:#81C784"></span>Concluído</span>`;
+  if(status==='andamento') return `<span class="badge" style="background:#00C2A822;color:#5EEAD4;border:1px solid #00C2A855"><span class="dot" style="background:#5EEAD4"></span>Em andamento</span>`;
+  return `<span class="badge" style="background:#C0392B22;color:#FF9B8A;border:1px solid #C0392B55"><span class="dot" style="background:#FF9B8A"></span>Pendente</span>`;
+}
+
+function renderLista(lista){
+  if(!lista.length) return '<div class="card text-center" style="padding:24px"><p style="color:#5C6889">Você ainda não fez nenhuma solicitação.</p></div>';
+  return lista.map(m=>{
+    const servicos = (m.servicos&&m.servicos.length)?m.servicos.join(", "):(m.tipoServico||"Manutenção");
+    return `
+      <button class="sol-item" onclick='mostrarDetalhe(${JSON.stringify(m.id)})'>
+        <div style="min-width:0;flex:1">
+          <div class="sol-title">🔧 ${m.placa} — ${servicos}</div>
+          <div class="sol-sub">Solicitado em ${fmtData(m.dataSolicitacao)}</div>
+        </div>
+        ${badgeStatus(m.status)}
+      </button>`;
+  }).join('');
+}
+
+let _minhasSolicitacoes = [];
+async function mostrarDetalhe(id){
+  if(!_minhasSolicitacoes.length){ try{ _minhasSolicitacoes = await api("GET","/api/manutencoes"); }catch(e){} }
+  const m = _minhasSolicitacoes.find(x=>x.id===id);
+  if(!m) return;
+  const servicos = (m.servicos&&m.servicos.length)?m.servicos.join(", "):(m.tipoServico||"Manutenção");
+  render(`
+    <button class="volta-btn" onclick="showHome()">← Voltar</button>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-weight:800;font-size:17px">🔧 ${m.placa}</div>
+          <div style="color:#7C8AAE;font-size:13px;margin-top:2px">${servicos}</div>
+        </div>
+        ${badgeStatus(m.status)}
+      </div>
+      ${m.descricao?`<p style="color:#C8D2EC;font-size:13px;margin-top:12px">${m.descricao}</p>`:''}
+      ${m.pdfs?.length?`<div style="margin-top:12px">${m.pdfs.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#8FC1EA;font-size:12px;text-decoration:none">📄 ${p.name}</a>`).join('')}</div>`:''}
+    </div>
+    <div class="card">
+      <div class="data-grid">
+        <div class="data-item"><label>Data da solicitação</label><p>${fmtData(m.dataSolicitacao)}</p></div>
+        <div class="data-item"><label>Data de resposta</label><p>${fmtData(m.dataResposta)}</p></div>
+      </div>
+      ${m.respostaEmpresa?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4">Resposta da empresa</p><p style="color:#C8D2EC;font-size:13px">${m.respostaEmpresa}</p></div>`:''}
+      ${m.obsConclusao?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#81C784">Serviço executado</p><p style="color:#C8D2EC;font-size:13px">${m.obsConclusao}</p></div>`:''}
+    </div>
+  `);
+}
+
+// ===== NOVA SOLICITAÇÃO =====
+function renderServicosTags(){
+  if(!servicosTmp.length) return '<p style="color:#5C6889;font-size:12px;margin-bottom:12px">Nenhum serviço adicionado ainda.</p>';
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+    ${servicosTmp.map((s,i)=>`
+      <span style="background:#10141F;border:1px solid #2C3550;border-radius:999px;padding:5px 10px 5px 12px;font-size:12px;color:#C8D2EC;display:inline-flex;align-items:center;gap:6px">
+        ${s}
+        <button type="button" onclick="removerServico(${i})" style="background:transparent;border:none;color:#7C8AAE;cursor:pointer;font-size:14px;line-height:1;padding:0">×</button>
+      </span>`).join('')}
+  </div>`;
+}
+
+function adicionarServico(){
+  const input = $("fm-servico-input");
+  const v = input?.value?.trim();
+  if(!v) return;
+  servicosTmp.push(v);
+  input.value=''; input.focus();
+  $("fm-servicos-lista").innerHTML = renderServicosTags();
+}
+
+function removerServico(i){
+  servicosTmp.splice(i,1);
+  $("fm-servicos-lista").innerHTML = renderServicosTags();
+}
+
+async function addFoto(input){
+  const files = Array.from(input.files||[]);
+  const vagas = 10-fotosTmp.length;
+  const sel = files.slice(0,vagas);
+  if(files.length>vagas) setErro('fm-erro',`Só foi possível adicionar ${vagas} foto(s). Limite de 10.`);
+  for(const f of sel){ try{ fotosTmp.push(await compressImage(f)); }catch{} }
+  input.value='';
+  renderFotoGrid();
+}
+
+function renderFotoGrid(){
+  const count = $('fm-foto-count');
+  const btnCam = $('fm-foto-btn-cam');
+  const btnGal = $('fm-foto-btn-gal');
+  const grid = $('fm-foto-grid');
+  if(count) count.textContent = fotosTmp.length+'/10';
+  const atingiuLimite = fotosTmp.length>=10;
+  if(btnCam) btnCam.classList.toggle('hidden', atingiuLimite);
+  if(btnGal) btnGal.classList.toggle('hidden', atingiuLimite);
+  if(!grid) return;
+  if(!fotosTmp.length){ grid.innerHTML=''; return; }
+  grid.innerHTML = `<div class="foto-grid">
+    ${fotosTmp.map((src,i)=>`
+      <div class="foto-item">
+        <img src="${src}" alt="foto ${i+1}"/>
+        <button class="foto-del" onclick="removeFoto(${i})">×</button>
+        <div class="foto-num">${i+1}</div>
+      </div>`).join('')}
+  </div>`;
+}
+function removeFoto(i){ fotosTmp.splice(i,1); renderFotoGrid(); }
+
+function readFileAsDataURL(file){ return new Promise((res,rej)=>{
+  const r = new FileReader();
+  r.onload = e => res(e.target.result);
+  r.onerror = rej;
+  r.readAsDataURL(file);
+});}
+
+async function addPdf(input){
+  const files = Array.from(input.files||[]);
+  const vagas = MAX_PDFS - pdfsTmp.length;
+  const sel = files.slice(0, vagas);
+  if(files.length > vagas) setErro('fm-erro', `Só foi possível adicionar ${vagas} PDF(s). Limite de ${MAX_PDFS}.`);
+  for(const f of sel){
+    if(f.size > MAX_PDF_MB*1024*1024){
+      setErro('fm-erro', `O arquivo "${f.name}" passa de ${MAX_PDF_MB}MB e não foi adicionado.`);
+      continue;
+    }
+    try{
+      const data = await readFileAsDataURL(f);
+      pdfsTmp.push({ name: f.name, data });
+    }catch(e){}
+  }
+  input.value = '';
+  renderPdfList();
+}
+
+function renderPdfList(){
+  const count = $('fm-pdf-count');
+  const btnLabel = $('fm-pdf-btn-label');
+  const lista = $('fm-pdf-lista');
+  if(count) count.textContent = pdfsTmp.length+'/'+MAX_PDFS;
+  if(btnLabel) btnLabel.classList.toggle('hidden', pdfsTmp.length>=MAX_PDFS);
+  if(!lista) return;
+  if(!pdfsTmp.length){ lista.innerHTML=''; return; }
+  lista.innerHTML = pdfsTmp.map((p,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px">
+      <span style="font-size:12px;color:#C8D2EC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px">📄 ${p.name}</span>
+      <button onclick="removePdf(${i})" style="background:transparent;border:none;color:#FF9B8A;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px">×</button>
+    </div>`).join('');
+}
+
+function removePdf(i){ pdfsTmp.splice(i,1); renderPdfList(); }
+
+function showFormSolicitacao(){
+  servicosTmp = []; fotosTmp = []; pdfsTmp = [];
+  render(`
+    <button class="volta-btn" onclick="showHome()">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">🔧 Nova Solicitação</div>
+    <div class="card">
+      <label class="field-label">Placa do veículo *</label>
+      <input class="field-input" id="fm-placa" placeholder="ABC1D23" maxlength="8" oninput="this.value=this.value.toUpperCase()"/>
+
+      <label class="field-label">Serviços necessários *</label>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="field-input" id="fm-servico-input" style="margin:0;flex:1" placeholder="Ex: Troca de óleo"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();adicionarServico();}"/>
+        <button type="button" onclick="adicionarServico()" style="padding:0 16px;border-radius:8px;border:1px solid #2E86D9;background:#2E86D922;color:#2E86D9;cursor:pointer;font-size:13px;font-weight:700">+ Add</button>
+      </div>
+      <div id="fm-servicos-lista">${renderServicosTags()}</div>
+
+      <label class="field-label">Descrição do problema</label>
+      <textarea class="field-textarea" id="fm-desc" rows="3" placeholder="Descreva o que está acontecendo (opcional)"></textarea>
+
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <label class="field-label" style="margin:0">Fotos (opcional)</label>
+        <span id="fm-foto-count" style="font-size:11px;color:#7C8AAE;font-weight:700">0/10</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="file" accept="image/*" capture="environment" id="fm-foto-input-cam" class="hidden" onchange="addFoto(this)"/>
+        <label for="fm-foto-input-cam" id="fm-foto-btn-cam" class="foto-btn-vazio" style="flex:1">📷 Câmera</label>
+        <input type="file" accept="image/*" id="fm-foto-input-gal" class="hidden" multiple onchange="addFoto(this)"/>
+        <label for="fm-foto-input-gal" id="fm-foto-btn-gal" class="foto-btn-vazio" style="flex:1">🖼 Galeria</label>
+      </div>
+      <div id="fm-foto-grid" style="margin-top:8px"></div>
+
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;margin-top:16px">
+        <label class="field-label" style="margin:0">PDF (opcional)</label>
+        <span id="fm-pdf-count" style="font-size:11px;color:#7C8AAE;font-weight:700">0/${MAX_PDFS}</span>
+      </div>
+      <input type="file" accept="application/pdf" id="fm-pdf-input" class="hidden" multiple onchange="addPdf(this)"/>
+      <label for="fm-pdf-input" id="fm-pdf-btn-label" class="foto-btn-vazio">📄 Adicionar PDF</label>
+      <div id="fm-pdf-lista" style="margin-top:8px"></div>
+      <p style="color:#5C6889;font-size:11px;margin-bottom:0">Até ${MAX_PDFS} arquivos, ${MAX_PDF_MB}MB cada.</p>
+
+      <div id="fm-erro" style="margin-top:12px"></div>
+      <button class="btn btn-primary" id="fm-btn" style="margin-top:14px" onclick="enviarSolicitacao()">📧 Enviar solicitação</button>
+    </div>
+  `);
+}
+
+async function enviarSolicitacao(){
+  const placa = $("fm-placa")?.value?.trim().toUpperCase();
+  const descricao = $("fm-desc")?.value?.trim()||'';
+  if(!placa||!servicosTmp.length){ setErro("fm-erro","Informe a placa e ao menos um serviço."); return; }
+
+  const btn = $("fm-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Enviando...';
+
+  const registro = {
+    id: uid(),
+    placa,
+    servicos: [...servicosTmp],
+    descricao,
+    dataSolicitacao: Date.now(),
+    dataResposta: null,
+    obsConclusao: '',
+    fotos: [...fotosTmp],
+    pdfs: [...pdfsTmp],
+    status: 'pendente',
+    criadoEm: Date.now()
+  };
+
+  try{
+    const r = await api("POST","/api/manutencoes", registro);
+    showConfirmacao(r);
+  }catch(e){
+    setErro("fm-erro","Erro ao enviar: "+e.message);
+    btn.disabled = false; btn.innerHTML = '📧 Enviar solicitação';
+  }
+}
+
+function showConfirmacao(r){
+  const emailStatus = r?.email?.enviado;
+  let emailBlock;
+  if (emailStatus === true) {
+    emailBlock = `<div class="success">📧 A equipe de manutenção foi notificada por e-mail.</div>`;
+  } else if (emailStatus === false) {
+    emailBlock = `<div class="erro">⚠ A solicitação foi salva, mas o e-mail não pôde ser enviado. A equipe do Gestor já tem acesso ao registro mesmo assim.</div>`;
+  } else if (emailStatus === null) {
+    emailBlock = `<div class="success">📧 A solicitação foi salva. O e-mail de notificação está sendo enviado agora.</div>`;
+  } else {
+    emailBlock = '';
+  }
+  render(`
+    <div class="text-center" style="padding-top:24px">
+      <div class="success-icon">✅</div>
+      <h2 style="font-size:18px;font-weight:800;margin-bottom:8px">Solicitação enviada!</h2>
+      <p style="color:#7C8AAE;font-size:13px;margin-bottom:16px">A solicitação para o veículo ${r.placa} foi registrada.</p>
+      ${emailBlock}
+      <button class="btn btn-primary" style="margin-top:16px" onclick="showFormSolicitacao()">🔧 Nova solicitação</button>
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="showHome()">Ver minhas solicitações</button>
+    </div>
+  `);
+}
+
+// ===== INSPEÇÃO PERIÓDICA =====
+let inspecoesTmp = [];
+let inspFotosTmp = { km: null, frente: null, lateralDireita: null, lateralEsquerda: null, traseira: null };
+const CAMPOS_FOTO_INSPECAO = [
+  { campo: 'km', label: 'Foto do KM' },
+  { campo: 'frente', label: 'Foto Frente' },
+  { campo: 'lateralDireita', label: 'Foto Lateral Direita' },
+  { campo: 'lateralEsquerda', label: 'Foto Lateral Esquerda' },
+  { campo: 'traseira', label: 'Foto Traseira' },
+];
+
+async function showInspecoesSetor(){
+  render('<div class="text-center" style="padding-top:40px;color:#7C8AAE">Carregando...</div>');
+  try{ inspecoesTmp = await api("GET","/api/inspecoes"); }catch(e){ inspecoesTmp = []; }
+  const ordenado = [...inspecoesTmp].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
+  render(`
+    <button class="volta-btn" onclick="showHome()">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">📋 Inspeção Periódica</div>
+    <p style="color:#7C8AAE;font-size:12px;margin-bottom:14px">Registro mensal do estado do veículo: km e fotos de frente, traseira, laterais e do painel.</p>
+    <button class="btn btn-primary" style="margin-bottom:16px" onclick="showFormInspecaoSetor()">+ Nova inspeção</button>
+    <div>${renderListaInspecoesSetor(ordenado)}</div>
+  `);
+}
+
+function renderListaInspecoesSetor(lista){
+  if(!lista.length) return '<div class="card text-center" style="padding:24px"><p style="color:#5C6889">Nenhuma inspeção registrada ainda.</p></div>';
+  return lista.map(i=>`
+    <button class="sol-item" onclick="showDetalheInspecaoSetor('${i.id}')">
+      <div style="min-width:0;flex:1">
+        <div class="sol-title">📋 ${i.placa} — ${(i.km||0).toLocaleString('pt-BR')} km</div>
+        <div class="sol-sub">${i.criadoEm?new Date(i.criadoEm).toLocaleDateString('pt-BR'):'—'}</div>
+      </div>
+    </button>`).join('');
+}
+
+function renderSlotFotoInsp(campo, label){
+  const src = inspFotosTmp[campo];
+  return `
+    <div id="insp-slot-${campo}">
+      <label class="field-label">${label} *</label>
+      ${src ? `
+        <div style="position:relative;border-radius:10px;overflow:hidden;margin-bottom:16px;aspect-ratio:4/3">
+          <img src="${src}" style="width:100%;height:100%;object-fit:cover"/>
+          <button onclick="removeFotoInsp('${campo}')" style="position:absolute;top:8px;right:8px;background:#C0392B;border:none;border-radius:50%;width:28px;height:28px;color:#fff;cursor:pointer;font-size:16px;font-weight:700">×</button>
+        </div>
+      ` : `
+        <input type="file" accept="image/*" capture="environment" id="insp-input-${campo}" class="hidden" onchange="addFotoInsp('${campo}', this)"/>
+        <label for="insp-input-${campo}" class="foto-btn-vazio" style="margin-bottom:16px">📷 Tirar / escolher foto</label>
+      `}
+    </div>
+  `;
+}
+
+async function addFotoInsp(campo, input){
+  const file = input.files?.[0];
+  if(!file) return;
+  try{ inspFotosTmp[campo] = await compressImage(file); }catch(e){}
+  const slot = $(`insp-slot-${campo}`);
+  const label = CAMPOS_FOTO_INSPECAO.find(c=>c.campo===campo)?.label || '';
+  if(slot) slot.outerHTML = renderSlotFotoInsp(campo, label);
+}
+
+function removeFotoInsp(campo){
+  inspFotosTmp[campo] = null;
+  const slot = $(`insp-slot-${campo}`);
+  const label = CAMPOS_FOTO_INSPECAO.find(c=>c.campo===campo)?.label || '';
+  if(slot) slot.outerHTML = renderSlotFotoInsp(campo, label);
+}
+
+function showFormInspecaoSetor(){
+  inspFotosTmp = { km: null, frente: null, lateralDireita: null, lateralEsquerda: null, traseira: null };
+  render(`
+    <button class="volta-btn" onclick="showInspecoesSetor()">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">📋 Nova Inspeção Periódica</div>
+    <div class="card">
+      <label class="field-label">Placa *</label>
+      <input class="field-input" id="insp-placa" placeholder="ABC1D23" maxlength="8" oninput="this.value=this.value.toUpperCase()"/>
+
+      <label class="field-label">KM atual *</label>
+      <input class="field-input" id="insp-km" type="number" inputmode="numeric" placeholder="Ex: 45230"/>
+
+      ${CAMPOS_FOTO_INSPECAO.map(c=>renderSlotFotoInsp(c.campo, c.label)).join('')}
+
+      <div id="insp-erro"></div>
+      <button class="btn btn-primary" id="insp-btn" onclick="enviarInspecaoSetor()">📋 Registrar inspeção</button>
+    </div>
+  `);
+}
+
+async function enviarInspecaoSetor(){
+  const placa = $("insp-placa")?.value?.trim().toUpperCase();
+  const km = parseInt($("insp-km")?.value, 10);
+  if(!placa){ setErro("insp-erro","Informe a placa."); return; }
+  if(!km || km<0){ setErro("insp-erro","Informe o KM atual."); return; }
+  const faltando = CAMPOS_FOTO_INSPECAO.filter(c=>!inspFotosTmp[c.campo]);
+  if(faltando.length){ setErro("insp-erro",`Faltam fotos: ${faltando.map(c=>c.label).join(', ')}.`); return; }
+
+  const registro = {
+    id: uid(), placa, km,
+    fotoKm: inspFotosTmp.km,
+    fotoFrente: inspFotosTmp.frente,
+    fotoLateralDireita: inspFotosTmp.lateralDireita,
+    fotoLateralEsquerda: inspFotosTmp.lateralEsquerda,
+    fotoTraseira: inspFotosTmp.traseira,
+    criadoEm: Date.now()
+  };
+
+  const btn = $("insp-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    await api("POST","/api/inspecoes", registro);
+    showInspecoesSetor();
+  }catch(e){
+    setErro("insp-erro","Erro ao salvar: "+e.message);
+    btn.disabled = false; btn.innerHTML = '📋 Registrar inspeção';
+  }
+}
+
+function showDetalheInspecaoSetor(id){
+  const insp = inspecoesTmp.find(x=>x.id===id);
+  if(!insp) return;
+  render(`
+    <button class="volta-btn" onclick="showInspecoesSetor()">← Voltar</button>
+    <div class="card">
+      <div style="font-weight:800;font-size:17px">📋 ${insp.placa}</div>
+      <div style="color:#7C8AAE;font-size:13px;margin-top:2px">${(insp.km||0).toLocaleString('pt-BR')} km · ${insp.criadoEm?new Date(insp.criadoEm).toLocaleDateString('pt-BR'):'—'}</div>
+    </div>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${CAMPOS_FOTO_INSPECAO.map(c=>`
+          <div>
+            <div style="border-radius:10px;overflow:hidden;aspect-ratio:4/3;margin-bottom:4px">
+              <img src="${insp['foto'+c.campo.charAt(0).toUpperCase()+c.campo.slice(1)]}" style="width:100%;height:100%;object-fit:cover"/>
+            </div>
+            <p style="color:#7C8AAE;font-size:10px;text-align:center">${c.label}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `);
+}
+
+// ===== BOOT =====
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw-manutencao.js').catch(()=>{});
+  });
+}
+
+if(carregarSessao()){
+  $("btn-sair").classList.remove("hidden");
+  showHome();
+} else {
+  showLogin();
+}
+</script>
+</body>
+</html>
