@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Frota Conecta — Empresa</title>
+
+<meta name="theme-color" content="#00A896"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Empresa"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="manifest" href="manifest-empresa.json"/>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#10141F;color:#fff;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh}
+input,textarea,button,select{font-family:inherit}
+.app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.header{padding:20px 20px 14px;display:flex;justify-content:space-between;align-items:center}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-box{width:36px;height:36px;background:#194C7D;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;overflow:hidden}
+.logo-box img{width:100%;height:100%;object-fit:cover}
+.logo-text h1{color:#fff;font-size:16px;font-weight:800}
+.logo-text p{color:#7C8AAE;font-size:11px}
+.btn-sair{background:#1C2333;border:1px solid #2C3550;border-radius:8px;padding:6px 12px;color:#7C8AAE;cursor:pointer;font-size:12px}
+.main{padding:0 20px 40px;flex:1}
+.card{background:#1C2333;border:1px solid #2C3550;border-radius:12px;padding:16px;margin-bottom:12px}
+.btn{width:100%;border-radius:12px;padding:14px;font-weight:700;font-size:15px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:#2E86D9;color:#1C2333}
+.btn-ghost{background:transparent;color:#7C8AAE;border:1px solid #2C3550}
+.tabs{display:flex;background:#1C2333;border-radius:10px;padding:4px;margin-bottom:16px}
+.tab{flex:1;padding:8px 0;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-size:13px;transition:all .2s;background:transparent;color:#7C8AAE}
+.tab.active{background:#2E86D9;color:#1C2333}
+.field-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#7C8AAE;display:block;margin-bottom:6px}
+.field-input{width:100%;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:10px;color:#fff;font-size:15px;outline:none;margin-bottom:16px}
+.field-input::placeholder{color:#5C6889}
+.field-textarea{width:100%;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:10px;color:#fff;font-size:13px;outline:none;resize:none;margin-bottom:16px}
+.foto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.foto-item{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1}
+.foto-item img{width:100%;height:100%;object-fit:cover}
+.foto-del{position:absolute;top:4px;right:4px;background:#C0392B;border:none;border-radius:50%;width:22px;height:22px;color:#fff;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.foto-num{position:absolute;bottom:0;left:0;right:0;background:#00000088;color:#fff;text-align:center;font-size:10px;padding:2px}
+.foto-btn-vazio{display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px;width:100%}
+.erro{background:#C0392B22;border:1px solid #C0392B55;color:#FF9B8A;border-radius:8px;padding:10px 14px;font-size:13px;display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
+.success{background:#2E7D3222;border:1px solid #2E7D3255;color:#81C784;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.sol-item{background:#1C2333;border:1px solid #2C3550;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;width:100%;text-align:left}
+.sol-title{color:#fff;font-weight:600;font-size:14px}
+.sol-sub{color:#7C8AAE;font-size:12px;margin-top:2px}
+.volta-btn{background:none;border:none;color:#7C8AAE;cursor:pointer;font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.data-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.data-item label{color:#7C8AAE;font-size:11px;display:block}
+.data-item p{color:#fff;font-size:12px;margin-top:2px}
+.success-icon{width:64px;height:64px;background:#2E7D3222;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px}
+.text-center{text-align:center}
+.hidden{display:none!important}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-box">🏢</div>
+      <div class="logo-text">
+        <h1>Frota Conecta</h1>
+        <p>Empresa</p>
+      </div>
+    </div>
+    <button class="btn-sair hidden" id="btn-sair" onclick="logout()">Sair</button>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+const BACKEND = "https://frota-conecta-backend.onrender.com";
+let session = null, sessionToken = null;
+let manutencoesTmp = [];
+let pdfsRespostaTmp = [];
+const MAX_PDFS = 3;
+const MAX_PDF_MB = 4;
+
+function $(id){ return document.getElementById(id); }
+function render(html){ $("main").innerHTML = html; }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function setErro(id,msg){ $(id).innerHTML = msg?`<div class="erro">⚠ ${msg}</div>`:''; }
+function fmtData(ts){ return ts ? new Date(ts).toLocaleDateString("pt-BR") : "—"; }
+
+async function api(method, path, body){
+  const headers = {"Content-Type":"application/json"};
+  if(sessionToken) headers["Authorization"] = "Bearer "+sessionToken;
+  const res = await fetch(BACKEND+path, {
+    method, headers,
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(90000)
+  });
+  if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error(e.error||`Erro ${res.status}`); }
+  return res.json();
+}
+
+function readFileAsDataURL(file){ return new Promise((res,rej)=>{
+  const r = new FileReader();
+  r.onload = e => res(e.target.result);
+  r.onerror = rej;
+  r.readAsDataURL(file);
+});}
+
+// ===== SESSÃO =====
+function salvarSessao(){
+  try{ localStorage.setItem("emp_session", JSON.stringify({session, sessionToken})); }catch(e){}
+}
+function carregarSessao(){
+  try{
+    const s = JSON.parse(localStorage.getItem("emp_session")||"null");
+    if(s?.session && s?.sessionToken){ session = s.session; sessionToken = s.sessionToken; return true; }
+  }catch(e){}
+  return false;
+}
+function logout(){
+  session = null; sessionToken = null;
+  try{ localStorage.removeItem("emp_session"); }catch(e){}
+  $("btn-sair").classList.add("hidden");
+  showLogin();
+}
+
+// ===== LOGIN =====
+function showLogin(){
+  $("btn-sair").classList.add("hidden");
+  window._empAba = window._empAba || 'entrar';
+  render(`
+    <div class="tabs">
+      <button class="tab ${window._empAba==='entrar'?'active':''}" onclick="mudarAbaLogin('entrar')">Entrar</button>
+      <button class="tab ${window._empAba==='criar'?'active':''}" onclick="mudarAbaLogin('criar')">Criar acesso</button>
+    </div>
+    <div class="card">
+      <label class="field-label">Nome da empresa *</label>
+      <input class="field-input" id="ln-nome" placeholder="Ex: Oficina Central Ltda"/>
+      <label class="field-label">PIN *</label>
+      <input class="field-input" id="ln-pin" type="password" inputmode="numeric" placeholder="••••"/>
+      ${window._empAba==='criar'?`
+        <label class="field-label">Confirmar PIN *</label>
+        <input class="field-input" id="ln-pin2" type="password" inputmode="numeric" placeholder="••••"/>
+        <label class="field-label">Código de acesso *</label>
+        <input class="field-input" id="ln-codigo" placeholder="Fornecido pela ALE/RO"/>
+      `:''}
+      <div id="ln-erro"></div>
+      <button class="btn btn-primary" id="ln-btn" onclick="${window._empAba==='criar'?'criarConta()':'entrar()'}">
+        ${window._empAba==='criar'?'Criar acesso':'Entrar'}
+      </button>
+    </div>
+  `);
+}
+
+function mudarAbaLogin(aba){
+  window._empAba = aba;
+  showLogin();
+}
+
+async function entrar(){
+  const nome = $("ln-nome")?.value?.trim();
+  const pin = $("ln-pin")?.value;
+  if(!nome||!pin){ setErro("ln-erro","Preencha nome e PIN."); return; }
+  const btn = $("ln-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    const r = await api("POST","/api/usuarios/login", { role:"empresa", nome, pin });
+    session = r; sessionToken = r.token;
+    salvarSessao();
+    $("btn-sair").classList.remove("hidden");
+    showHome();
+  }catch(e){
+    setErro("ln-erro", e.message);
+    btn.disabled = false; btn.textContent = "Entrar";
+  }
+}
+
+async function criarConta(){
+  const nome = $("ln-nome")?.value?.trim();
+  const pin = $("ln-pin")?.value;
+  const pin2 = $("ln-pin2")?.value;
+  const codigo = $("ln-codigo")?.value?.trim();
+  if(!nome||!pin||!pin2||!codigo){ setErro("ln-erro","Preencha todos os campos."); return; }
+  if(pin.length<4){ setErro("ln-erro","O PIN deve ter pelo menos 4 dígitos."); return; }
+  if(pin!==pin2){ setErro("ln-erro","Os PINs não conferem."); return; }
+  const btn = $("ln-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    const r = await api("POST","/api/usuarios", { id: uid(), role:"empresa", nome, pin, codigo, criadoEm: Date.now() });
+    session = r; sessionToken = r.token;
+    salvarSessao();
+    $("btn-sair").classList.remove("hidden");
+    showHome();
+  }catch(e){
+    setErro("ln-erro", e.message);
+    btn.disabled = false; btn.textContent = "Criar acesso";
+  }
+}
+
+// ===== HOME =====
+function statusLabel(status){
+  if(status==='concluido') return 'Concluído';
+  if(status==='andamento') return 'Em andamento';
+  return 'Pendente';
+}
+function badgeStatus(status){
+  if(status==='concluido') return `<span class="badge" style="background:#2E7D3222;color:#81C784;border:1px solid #2E7D3255"><span class="dot" style="background:#81C784"></span>Concluído</span>`;
+  if(status==='andamento') return `<span class="badge" style="background:#00C2A822;color:#5EEAD4;border:1px solid #00C2A855"><span class="dot" style="background:#5EEAD4"></span>Em andamento</span>`;
+  return `<span class="badge" style="background:#C0392B22;color:#FF9B8A;border:1px solid #C0392B55"><span class="dot" style="background:#FF9B8A"></span>Pendente</span>`;
+}
+function resumoServicos(m){
+  const arr = (m.servicos&&m.servicos.length) ? m.servicos : (m.tipoServico?[m.tipoServico]:[]);
+  return arr.length ? arr.join(', ') : 'Manutenção';
+}
+
+async function showHome(){
+  render('<div class="text-center" style="padding-top:40px;color:#7C8AAE">Carregando...</div>');
+  try{ manutencoesTmp = await api("GET","/api/manutencoes"); }catch(e){ manutencoesTmp = []; }
+  window._empFiltro = window._empFiltro || 'pendente';
+  renderHomeContent();
+}
+
+function renderHomeContent(){
+  const filtro = window._empFiltro || 'pendente';
+  const pendentes = manutencoesTmp.filter(m=>(m.status||'pendente')==='pendente').length;
+  const andamento = manutencoesTmp.filter(m=>m.status==='andamento').length;
+  const concluidas = manutencoesTmp.filter(m=>m.status==='concluido').length;
+  const tabStyle = (s)=> s===filtro
+    ? 'padding:9px;border-radius:8px;border:1px solid #00A896;background:#00A89622;color:#00A896;cursor:pointer;font-size:11px;font-weight:700'
+    : 'padding:9px;border-radius:8px;border:1px solid #2C3550;background:transparent;color:#7C8AAE;cursor:pointer;font-size:11px;font-weight:700';
+  let lista = [...manutencoesTmp];
+  if(filtro!=='todas') lista = lista.filter(m=>(m.status||'pendente')===filtro);
+  lista.sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
+
+  render(`
+    <div class="card text-center" style="padding:16px;margin-bottom:14px">
+      <p style="color:#7C8AAE;font-size:12px">Logado como</p>
+      <p style="font-weight:800;font-size:16px;margin-top:2px">${session.nome}</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div class="card" style="padding:10px;text-align:center">
+        <div style="font-size:9px;color:#7C8AAE;text-transform:uppercase">Pendentes</div>
+        <div style="font-size:18px;font-weight:800;color:#FF9B8A">${pendentes}</div>
+      </div>
+      <div class="card" style="padding:10px;text-align:center">
+        <div style="font-size:9px;color:#7C8AAE;text-transform:uppercase">Andamento</div>
+        <div style="font-size:18px;font-weight:800;color:#5EEAD4">${andamento}</div>
+      </div>
+      <div class="card" style="padding:10px;text-align:center">
+        <div style="font-size:9px;color:#7C8AAE;text-transform:uppercase">Concluídas</div>
+        <div style="font-size:18px;font-weight:800;color:#81C784">${concluidas}</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <button id="tab-pendente" onclick="mudarFiltro('pendente')" style="${tabStyle('pendente')}">Pendentes</button>
+      <button id="tab-andamento" onclick="mudarFiltro('andamento')" style="${tabStyle('andamento')}">Em andamento</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <button id="tab-concluido" onclick="mudarFiltro('concluido')" style="${tabStyle('concluido')}">Concluídas</button>
+      <button id="tab-todas" onclick="mudarFiltro('todas')" style="${tabStyle('todas')}">Todas</button>
+    </div>
+
+    <div id="lista-manut">${renderLista(lista)}</div>
+  `);
+}
+
+function mudarFiltro(status){
+  window._empFiltro = status;
+  renderHomeContent();
+}
+
+function renderLista(lista){
+  if(!lista.length) return '<div class="card text-center" style="padding:24px"><p style="color:#5C6889">Nenhuma solicitação encontrada.</p></div>';
+  return lista.map(m=>`
+    <button class="sol-item" onclick='mostrarDetalhe(${JSON.stringify(m.id)})'>
+      <div style="min-width:0;flex:1">
+        <div class="sol-title">🔧 ${m.placa} — ${resumoServicos(m)}</div>
+        <div class="sol-sub">${m.setor||'—'} · Solicitado em ${fmtData(m.dataSolicitacao)}</div>
+      </div>
+      ${badgeStatus(m.status)}
+    </button>`).join('');
+}
+
+// ===== DETALHE =====
+async function mostrarDetalhe(id){
+  render('<div class="text-center" style="padding-top:40px;color:#7C8AAE">Carregando...</div>');
+  let m;
+  try{ m = await api("GET",`/api/manutencoes/${id}`); }catch(e){ m = manutencoesTmp.find(x=>x.id===id); }
+  if(!m) return;
+  const idx = manutencoesTmp.findIndex(x=>x.id===id);
+  if(idx>=0) manutencoesTmp[idx] = {...manutencoesTmp[idx], ...m};
+
+  const st = m.status||'pendente';
+  render(`
+    <button class="volta-btn" onclick="showHome()">← Voltar</button>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-weight:800;font-size:17px">🔧 ${m.placa}</div>
+          <div style="color:#7C8AAE;font-size:13px;margin-top:2px">${resumoServicos(m)}</div>
+        </div>
+        ${badgeStatus(st)}
+      </div>
+      ${m.descricao?`<p style="color:#C8D2EC;font-size:13px;margin-top:12px">${m.descricao}</p>`:''}
+      ${m.fotos?.length?`<div style="margin-top:12px"><p style="color:#7C8AAE;font-size:11px;margin-bottom:8px">${m.fotos.length} foto(s) do setor</p><div class="foto-grid">${m.fotos.map((src,i)=>`<div class="foto-item"><img src="${src}"/><div class="foto-num">${i+1}</div></div>`).join('')}</div></div>`:''}
+      ${m.pdfs?.length?`<div style="margin-top:12px">${m.pdfs.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#8FC1EA;font-size:12px;text-decoration:none">📄 ${p.name}</a>`).join('')}</div>`:''}
+    </div>
+    <div class="card">
+      <div class="data-grid">
+        <div class="data-item"><label>Setor/Gabinete</label><p>${m.setor||'—'}</p></div>
+        <div class="data-item"><label>Data da solicitação</label><p>${fmtData(m.dataSolicitacao)}</p></div>
+      </div>
+      ${m.respostaEmpresa?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4">Sua resposta</p><p style="color:#C8D2EC;font-size:13px">${m.respostaEmpresa}</p></div>`:''}
+      ${m.obsConclusao?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#81C784">Serviço executado</p><p style="color:#C8D2EC;font-size:13px">${m.obsConclusao}</p></div>`:''}
+      ${m.pdfsResposta?.length?`<div style="margin-top:12px">${m.pdfsResposta.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#5EEAD4;font-size:12px;text-decoration:none">📄 ${p.name} (anexo seu)</a>`).join('')}</div>`:''}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${st==='pendente'?`<button onclick="showResponder('${id}')" style="flex:1;min-width:140px;padding:12px;border-radius:10px;border:1px solid #00C2A8;background:#00C2A822;color:#5EEAD4;cursor:pointer;font-size:13px;font-weight:700">▶ Iniciar / Responder</button>`:''}
+      ${st==='andamento'?`<button onclick="showResponder('${id}')" style="flex:1;min-width:140px;padding:12px;border-radius:10px;border:1px solid #00C2A8;background:#00C2A822;color:#5EEAD4;cursor:pointer;font-size:13px;font-weight:700">✏ Atualizar resposta</button>`:''}
+      ${st!=='concluido'?`<button onclick="showConcluir('${id}')" style="flex:1;min-width:140px;padding:12px;border-radius:10px;border:1px solid #2E7D32;background:#2E7D3222;color:#81C784;cursor:pointer;font-size:13px;font-weight:700">✅ Concluir</button>`:''}
+    </div>
+  `);
+}
+
+// ===== RESPONDER (Iniciar / Em andamento) =====
+function renderPdfListaResposta(){
+  if(!pdfsRespostaTmp.length) return '<p style="color:#5C6889;font-size:12px;margin-bottom:8px">Nenhum PDF anexado ainda.</p>';
+  return pdfsRespostaTmp.map((p,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px">
+      <span style="font-size:12px;color:#C8D2EC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px">📄 ${p.name}</span>
+      <button onclick="removePdfResposta(${i})" style="background:transparent;border:none;color:#FF9B8A;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px">×</button>
+    </div>`).join('');
+}
+
+async function addPdfResposta(input){
+  const files = Array.from(input.files||[]);
+  const vagas = MAX_PDFS - pdfsRespostaTmp.length;
+  const sel = files.slice(0, vagas);
+  if(files.length > vagas) setErro('resp-erro', `Só foi possível adicionar ${vagas} PDF(s). Limite de ${MAX_PDFS}.`);
+  for(const f of sel){
+    if(f.size > MAX_PDF_MB*1024*1024){
+      setErro('resp-erro', `O arquivo "${f.name}" passa de ${MAX_PDF_MB}MB e não foi adicionado.`);
+      continue;
+    }
+    try{
+      const data = await readFileAsDataURL(f);
+      pdfsRespostaTmp.push({ name: f.name, data });
+    }catch(e){}
+  }
+  input.value = '';
+  renderPdfListResposta();
+}
+
+function renderPdfListResposta(){
+  const count = $('resp-pdf-count');
+  const btn = $('resp-pdf-btn');
+  const lista = $('resp-pdf-lista');
+  if(count) count.textContent = pdfsRespostaTmp.length+'/'+MAX_PDFS;
+  if(btn) btn.classList.toggle('hidden', pdfsRespostaTmp.length>=MAX_PDFS);
+  if(lista) lista.innerHTML = renderPdfListaResposta();
+}
+
+function removePdfResposta(i){ pdfsRespostaTmp.splice(i,1); renderPdfListResposta(); }
+
+function showResponder(id){
+  const m = manutencoesTmp.find(x=>x.id===id);
+  if(!m) return;
+  pdfsRespostaTmp = m.pdfsResposta ? [...m.pdfsResposta] : [];
+  render(`
+    <button class="volta-btn" onclick="mostrarDetalhe('${id}')">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">▶ Iniciar / Responder</div>
+    <div class="card">
+      <div style="color:#7C8AAE;font-size:13px;margin-bottom:12px">🔧 ${m.placa} — ${resumoServicos(m)}</div>
+      <label class="field-label">Resposta (opcional)</label>
+      <textarea class="field-textarea" id="resp-texto" rows="3" placeholder="Ex: Agendado para sexta-feira, período da manhã...">${m.respostaEmpresa||''}</textarea>
+
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <label class="field-label" style="margin:0">Anexar PDF (opcional)</label>
+        <span id="resp-pdf-count" style="font-size:11px;color:#7C8AAE;font-weight:700">${pdfsRespostaTmp.length}/${MAX_PDFS}</span>
+      </div>
+      <input type="file" accept="application/pdf" id="resp-pdf-input" class="hidden" multiple onchange="addPdfResposta(this)"/>
+      <label for="resp-pdf-input" id="resp-pdf-btn" class="foto-btn-vazio">📄 Adicionar PDF</label>
+      <div id="resp-pdf-lista" style="margin-top:8px">${renderPdfListaResposta()}</div>
+
+      <div id="resp-erro" style="margin-top:8px"></div>
+      <button class="btn btn-primary" id="resp-btn" style="margin-top:14px" onclick="salvarResposta('${id}')">Salvar e marcar Em andamento</button>
+    </div>
+  `);
+}
+
+async function salvarResposta(id){
+  const respostaEmpresa = $("resp-texto")?.value?.trim()||'';
+  const btn = $("resp-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    const atualizado = await api("PATCH",`/api/manutencoes/${id}`, {
+      status: 'andamento',
+      respostaEmpresa,
+      pdfsResposta: [...pdfsRespostaTmp],
+    });
+    const idx = manutencoesTmp.findIndex(x=>x.id===id);
+    if(idx>=0) manutencoesTmp[idx] = {...manutencoesTmp[idx], ...atualizado};
+    mostrarDetalhe(id);
+  }catch(e){
+    setErro('resp-erro', 'Erro ao salvar: '+e.message);
+    btn.disabled = false; btn.textContent = 'Salvar e marcar Em andamento';
+  }
+}
+
+// ===== CONCLUIR =====
+function showConcluir(id){
+  const m = manutencoesTmp.find(x=>x.id===id);
+  if(!m) return;
+  pdfsRespostaTmp = m.pdfsResposta ? [...m.pdfsResposta] : [];
+  render(`
+    <button class="volta-btn" onclick="mostrarDetalhe('${id}')">← Voltar</button>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">✅ Concluir Serviço</div>
+    <div class="card">
+      <div style="color:#7C8AAE;font-size:13px;margin-bottom:12px">🔧 ${m.placa} — ${resumoServicos(m)}</div>
+      <label class="field-label">Serviço executado *</label>
+      <textarea class="field-textarea" id="concl-texto" rows="4" placeholder="Descreva o que foi feito...">${m.obsConclusao||''}</textarea>
+
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <label class="field-label" style="margin:0">Anexar PDF (opcional)</label>
+        <span id="resp-pdf-count" style="font-size:11px;color:#7C8AAE;font-weight:700">${pdfsRespostaTmp.length}/${MAX_PDFS}</span>
+      </div>
+      <input type="file" accept="application/pdf" id="resp-pdf-input" class="hidden" multiple onchange="addPdfResposta(this)"/>
+      <label for="resp-pdf-input" id="resp-pdf-btn" class="foto-btn-vazio">📄 Adicionar PDF</label>
+      <div id="resp-pdf-lista" style="margin-top:8px">${renderPdfListaResposta()}</div>
+
+      <div id="concl-erro" style="margin-top:8px"></div>
+      <button class="btn btn-primary" id="concl-btn" style="margin-top:14px" onclick="salvarConclusao('${id}')">✅ Marcar como concluído</button>
+    </div>
+  `);
+}
+
+async function salvarConclusao(id){
+  const obsConclusao = $("concl-texto")?.value?.trim();
+  if(!obsConclusao){ setErro('concl-erro', 'Descreva o serviço executado.'); return; }
+  const btn = $("concl-btn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try{
+    const atualizado = await api("PATCH",`/api/manutencoes/${id}`, {
+      status: 'concluido',
+      obsConclusao,
+      dataResposta: Date.now(),
+      pdfsResposta: [...pdfsRespostaTmp],
+    });
+    const idx = manutencoesTmp.findIndex(x=>x.id===id);
+    if(idx>=0) manutencoesTmp[idx] = {...manutencoesTmp[idx], ...atualizado};
+    mostrarDetalhe(id);
+  }catch(e){
+    setErro('concl-erro', 'Erro ao salvar: '+e.message);
+    btn.disabled = false; btn.innerHTML = '✅ Marcar como concluído';
+  }
+}
+
+// ===== BOOT =====
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw-empresa.js').catch(()=>{});
+  });
+}
+
+if(carregarSessao()){
+  $("btn-sair").classList.remove("hidden");
+  showHome();
+} else {
+  showLogin();
+}
+</script>
+
+</body>
+</html>
