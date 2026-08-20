@@ -1,4 +1,4 @@
-const CACHE = 'frota-conecta-v10';
+const CACHE = 'frota-conecta-v11';
 const ASSETS = [
   '/frota-app/',
   '/frota-app/index.html',
@@ -25,5 +25,33 @@ self.addEventListener('fetch', e => {
   // Sempre busca da rede primeiro (ignorando cache HTTP), usa cache só se falhar
   e.respondWith(
     fetch(e.request, { cache: 'no-store' }).catch(() => caches.match(e.request))
+  );
+});
+
+self.addEventListener('push', e => {
+  let data = {};
+  try{ data = e.data ? e.data.json() : {}; }catch(err){}
+  const title = data.title || 'Frota Conecta';
+  const options = {
+    body: data.body || '',
+    icon: '/frota-app/icon-192.png',
+    badge: '/frota-app/icon-192.png',
+    data: { url: data.url || '/frota-app/' },
+  };
+  e.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = e.notification.data?.url || '/frota-app/';
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const client of list) {
+        if (client.url.includes('index.html') || client.url.endsWith('/frota-app/')) {
+          if ('focus' in client) return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
   );
 });

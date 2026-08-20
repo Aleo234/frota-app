@@ -1335,6 +1335,7 @@ async function showGestor(aba="home"){
     <div style="text-align:center;margin-bottom:20px">
       <div style="font-size:13px;color:#7C8AAE">Olá, <strong style="color:#fff">${session.nome?.split(' ')[0]}</strong> — Gestão de frota</div>
     </div>
+    ${renderBotaoNotificacao()}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
 
       <button onclick="showGestor('lista');marcarVisto('sol')" style="position:relative;background:#1C2333;border:1px solid ${badgeSol>0?'#2E86D9':'#2C3550'};border-radius:16px;padding:20px 12px;cursor:pointer;text-align:center;transition:.2s">
@@ -6726,12 +6727,51 @@ async function init(){
 
 init();
 
-// Desregistrar service workers antigos
+// Registrar o service worker (necessário para notificações push)
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(reg => reg.unregister());
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
+
+// ===== NOTIFICAÇÕES PUSH =====
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function renderBotaoNotificacao(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return '';
+  if(Notification.permission === 'granted'){
+    return `<div style="background:#2E7D3222;border:1px solid #2E7D3255;border-radius:8px;padding:10px 12px;margin-bottom:16px;color:#81C784;font-size:12px;font-weight:700;text-align:center">🔔 Notificações ativadas</div>`;
+  }
+  if(Notification.permission === 'denied'){
+    return `<div style="background:#C0392B15;border:1px solid #C0392B55;border-radius:8px;padding:10px 12px;margin-bottom:16px;color:#FF9B8A;font-size:12px;text-align:center">🔕 Notificações bloqueadas — ative nas configurações do navegador se quiser recebê-las.</div>`;
+  }
+  return `<button onclick="ativarNotificacoes()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #FF9F1C;background:#FF9F1C11;color:#FF9F1C;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:16px">🔔 Ativar notificações</button>`;
+}
+
+async function ativarNotificacoes(){
+  try{
+    const permissao = await Notification.requestPermission();
+    if(permissao !== 'granted'){ showGestor('home'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const { publicKey } = await api('GET','/api/push/vapid-public-key');
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+    await api('POST','/api/push/subscribe', { subscription: sub });
+    showGestor('home');
+  }catch(e){
+    alert('Não foi possível ativar as notificações: '+e.message);
+  }
+}
+
 </script>
 </body>
 </html>
