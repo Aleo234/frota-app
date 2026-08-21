@@ -3126,7 +3126,9 @@ async function showInspecoes(){
     <button class="btn btn-primary" style="margin-bottom:10px" onclick="showFormInspecao()">+ Nova inspeção</button>
     <button onclick="showRelatorioInspecoes()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #00C2A8;background:#00C2A811;color:#5EEAD4;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:8px">📄 Relatório de inspeções</button>
     <button onclick="showRevisoes()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #FF9F1C;background:#FF9F1C11;color:#FF9F1C;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:14px">🔧 Revisões (10 em 10 mil km)</button>
-    <div>${renderListaInspecoes(ordenado)}</div>
+    <p style="color:#7C8AAE;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Últimas 5 inspeções</p>
+    <div>${renderListaInspecoes(ordenado.slice(0,5))}</div>
+    ${ordenado.length>5?`<p style="color:#5C6889;font-size:11px;text-align:center;margin-top:10px">Mostrando 5 de ${ordenado.length}. Veja o histórico completo no relatório.</p>`:''}
   `);
 }
 
