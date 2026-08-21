@@ -3721,18 +3721,27 @@ async function rejeitarUsuario(id, nome){
 
 let usuariosFiltroRole = 'motorista';
 
+const CONFIG_ROLE_USUARIOS = {
+  motorista: { icon: '🚗', label: 'Motoristas', plural: 'motorista(s)', singular: 'motorista' },
+  atendimento: { icon: '📋', label: 'Atendimento', plural: 'usuário(s) de atendimento', singular: 'usuário de atendimento' },
+  setor: { icon: '🏢', label: 'Setores', plural: 'setor(es)/gabinete(s)', singular: 'setor/gabinete' },
+};
+
 function renderMotoristas(usrs){
   const lista = usrs.filter(u=>u.role===usuariosFiltroRole);
   const isMotorista = usuariosFiltroRole==='motorista';
+  const cfg = CONFIG_ROLE_USUARIOS[usuariosFiltroRole];
   return `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <button onclick="trocarFiltroUsuarios('motorista')" style="padding:10px;border-radius:10px;border:2px solid ${isMotorista?'#2E86D9':'#2C3550'};background:${isMotorista?'#2E86D922':'#1C2333'};color:${isMotorista?'#2E86D9':'#7C8AAE'};cursor:pointer;font-size:13px;font-weight:700">🚗 Motoristas</button>
-      <button onclick="trocarFiltroUsuarios('atendimento')" style="padding:10px;border-radius:10px;border:2px solid ${!isMotorista?'#2E86D9':'#2C3550'};background:${!isMotorista?'#2E86D922':'#1C2333'};color:${!isMotorista?'#2E86D9':'#7C8AAE'};cursor:pointer;font-size:13px;font-weight:700">📋 Atendimento</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      ${Object.entries(CONFIG_ROLE_USUARIOS).map(([role,c])=>{
+        const ativo = usuariosFiltroRole===role;
+        return `<button onclick="trocarFiltroUsuarios('${role}')" style="padding:10px 4px;border-radius:10px;border:2px solid ${ativo?'#2E86D9':'#2C3550'};background:${ativo?'#2E86D922':'#1C2333'};color:${ativo?'#2E86D9':'#7C8AAE'};cursor:pointer;font-size:12px;font-weight:700">${c.icon} ${c.label}</button>`;
+      }).join('')}
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div><span style="font-weight:800;font-size:16px">${lista.length}</span> <span style="color:#7C8AAE;font-size:12px">${isMotorista?'motorista(s)':'usuário(s) de atendimento'} cadastrado(s)</span></div>
+      <div><span style="font-weight:800;font-size:16px">${lista.length}</span> <span style="color:#7C8AAE;font-size:12px">${cfg.plural} cadastrado(s)</span></div>
     </div>
-    ${lista.length===0?`<div class="card" style="text-align:center;padding:32px"><p style="font-size:32px;margin-bottom:8px">${isMotorista?'🚗':'📋'}</p><p style="color:#5C6889">Nenhum ${isMotorista?'motorista':'usuário de atendimento'} cadastrado.</p></div>`:''}
+    ${lista.length===0?`<div class="card" style="text-align:center;padding:32px"><p style="font-size:32px;margin-bottom:8px">${cfg.icon}</p><p style="color:#5C6889">Nenhum ${cfg.singular} cadastrado.</p></div>`:''}
     ${lista.map(m=>{
       const sols=isMotorista?records.filter(r=>r.motorista===m.nome):[];
       const ativas=sols.filter(r=>r.status==='enviado'||r.status==='andamento').length;
@@ -3740,9 +3749,10 @@ function renderMotoristas(usrs){
       return `<div class="card" style="margin-bottom:8px;opacity:${ativo?1:0.6}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div>
-            <div style="color:#fff;font-weight:700;font-size:14px">${isMotorista?'🚗':'📋'} ${m.nome}</div>
+            <div style="color:#fff;font-weight:700;font-size:14px">${cfg.icon} ${m.nome}</div>
             <div style="color:#7C8AAE;font-size:11px;margin-top:2px">Cadastrado em ${fmt(m.criadoEm)}</div>
             ${isMotorista?`<div style="color:#7C8AAE;font-size:11px">${sols.length} solicitação(ões) · ${ativas} ativa(s)</div>`:''}
+            ${usuariosFiltroRole==='setor'&&m.email?`<div style="color:#7C8AAE;font-size:11px">✉️ ${m.email}</div>`:''}
             ${m.aprovado===false?`<div style="color:#2E86D9;font-size:11px;font-weight:700;margin-top:2px">⏳ Aguardando aprovação</div>`:''}
           </div>
           <span style="padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;background:${ativo?'#2E7D3222':'#C0392B22'};color:${ativo?'#81C784':'#FF9B8A'};border:1px solid ${ativo?'#2E7D3255':'#C0392B55'}">
