@@ -267,6 +267,9 @@ async function loadRevisoes(){
 async function salvarRevisaoApi(rev){
   return await api("POST","/api/revisoes",rev);
 }
+async function atualizarRevisaoApi(id, patch){
+  return await api("PATCH",`/api/revisoes/${id}`,patch);
+}
 async function excluirRevisaoApi(id){
   return await api("DELETE",`/api/revisoes/${id}`);
 }
@@ -3504,39 +3507,44 @@ function renderListaRevisoes(lista){
           ${r.observacao?`<div style="color:#C8D2EC;font-size:12px;margin-top:6px">${r.observacao}</div>`:''}
           <div style="color:#5EEAD4;font-size:11px;margin-top:6px">Próxima revisão prevista: ${((r.km||0)+KM_INTERVALO_REVISAO).toLocaleString('pt-BR')} km</div>
         </div>
-        <button onclick="excluirRevisaoConfirm('${r.id}')" style="background:transparent;border:none;color:#FF9B8A;cursor:pointer;font-size:16px;padding:2px">×</button>
+        <div style="display:flex;gap:10px;flex-shrink:0">
+          <button onclick="showFormRevisao('${r.id}')" style="background:transparent;border:none;color:#9DB0D6;cursor:pointer;font-size:14px;padding:2px">✏️</button>
+          <button onclick="excluirRevisaoConfirm('${r.id}')" style="background:transparent;border:none;color:#FF9B8A;cursor:pointer;font-size:16px;padding:2px">×</button>
+        </div>
       </div>
     </div>`).join('');
 }
 
-function showFormRevisao(){
+function showFormRevisao(id){
+  const rev = id ? revisoes.find(x=>x.id===id) : null;
   const hoje = new Date().toISOString().slice(0,10);
+  const dataInput = rev?.dataRevisao ? new Date(rev.dataRevisao).toISOString().slice(0,10) : hoje;
   render(`
     <button class="volta-btn" onclick="showRevisoes()">← Voltar</button>
-    <div style="font-weight:800;font-size:16px;margin-bottom:16px">🔧 Registrar Revisão</div>
+    <div style="font-weight:800;font-size:16px;margin-bottom:16px">🔧 ${id?'Editar':'Registrar'} Revisão</div>
     <div class="card">
       <label class="field-label">Placa *</label>
-      <input class="field-input" id="rv-placa" placeholder="ABC1D23" maxlength="8" oninput="this.value=this.value.toUpperCase()"/>
+      <input class="field-input" id="rv-placa" value="${rev?.placa||''}" placeholder="ABC1D23" maxlength="8" oninput="this.value=this.value.toUpperCase()"/>
 
       <label class="field-label">KM da revisão *</label>
-      <input class="field-input" id="rv-km" type="number" inputmode="numeric" placeholder="Ex: 50000"/>
+      <input class="field-input" id="rv-km" type="number" inputmode="numeric" value="${rev?.km||''}" placeholder="Ex: 50000"/>
 
       <label class="field-label">Data da revisão *</label>
-      <input type="date" class="field-input" id="rv-data" value="${hoje}"/>
+      <input type="date" class="field-input" id="rv-data" value="${dataInput}"/>
 
       <label class="field-label">Realizada por *</label>
-      <input class="field-input" id="rv-realizada-por" placeholder="Nome da oficina ou mecânico"/>
+      <input class="field-input" id="rv-realizada-por" value="${rev?.realizadaPor||''}" placeholder="Nome da oficina ou mecânico"/>
 
       <label class="field-label">Observações (opcional)</label>
-      <textarea class="field-textarea" id="rv-obs" rows="3" placeholder="Serviços feitos na revisão..."></textarea>
+      <textarea class="field-textarea" id="rv-obs" rows="3" placeholder="Serviços feitos na revisão...">${rev?.observacao||''}</textarea>
 
       <div id="rv-erro" style="margin-top:8px"></div>
-      <button class="btn btn-primary" style="margin-top:14px" onclick="salvarRevisaoForm()">🔧 Registrar revisão</button>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="salvarRevisaoForm('${id||''}')">🔧 ${id?'Salvar alterações':'Registrar revisão'}</button>
     </div>
   `);
 }
 
-async function salvarRevisaoForm(){
+async function salvarRevisaoForm(id){
   const placa = $("rv-placa")?.value?.trim().toUpperCase();
   const km = parseInt($("rv-km")?.value, 10);
   const dataInput = $("rv-data")?.value;
@@ -3548,19 +3556,26 @@ async function salvarRevisaoForm(){
   if(!dataInput){ setErro("rv-erro","Informe a data da revisão."); return; }
   if(!realizadaPor){ setErro("rv-erro","Informe quem realizou a revisão."); return; }
 
-  const registro = {
-    id: uid(),
-    placa, km,
-    dataRevisao: new Date(dataInput).getTime(),
-    realizadaPor,
-    observacao,
-    confirmadoPor: session?.nome || session?.usuario || '—',
-    criadoEm: Date.now()
-  };
+  const dataRevisao = new Date(dataInput).getTime();
 
   try{
-    const salvo = await salvarRevisaoApi(registro);
-    revisoes.unshift(salvo);
+    if(id){
+      const atualizado = await atualizarRevisaoApi(id, { placa, km, dataRevisao, realizadaPor, observacao });
+      const idx = revisoes.findIndex(x=>x.id===id);
+      if(idx>=0) revisoes[idx] = atualizado;
+    } else {
+      const registro = {
+        id: uid(),
+        placa, km,
+        dataRevisao,
+        realizadaPor,
+        observacao,
+        confirmadoPor: session?.nome || session?.usuario || '—',
+        criadoEm: Date.now()
+      };
+      const salvo = await salvarRevisaoApi(registro);
+      revisoes.unshift(salvo);
+    }
     showRevisoes();
   }catch(e){ setErro("rv-erro","Erro ao salvar: "+e.message); }
 }
