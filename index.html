@@ -3195,10 +3195,12 @@ function renderSlotFotoInsp(campo, label){
           <button onclick="removeFotoInsp('${campo}')" style="position:absolute;top:8px;right:8px;background:#C0392B;border:none;border-radius:50%;width:28px;height:28px;color:#fff;cursor:pointer;font-size:16px;font-weight:700">×</button>
         </div>
       ` : `
-        <input type="file" accept="image/*" capture="environment" id="insp-input-${campo}" class="hidden" onchange="addFotoInsp('${campo}', this)"/>
-        <label for="insp-input-${campo}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #00C2A8;border-radius:10px;padding:18px;cursor:pointer;color:#5EEAD4;font-size:13px;margin-bottom:12px">
-          📷 Tirar / escolher foto
-        </label>
+        <input type="file" accept="image/*" capture="environment" id="insp-input-cam-${campo}" class="hidden" onchange="addFotoInsp('${campo}', this)"/>
+        <input type="file" accept="image/*" id="insp-input-gal-${campo}" class="hidden" onchange="addFotoInsp('${campo}', this)"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <label for="insp-input-cam-${campo}" style="display:flex;align-items:center;justify-content:center;gap:6px;background:#10141F;border:1px dashed #00C2A8;border-radius:10px;padding:14px 8px;cursor:pointer;color:#5EEAD4;font-size:12px">📷 Câmera</label>
+          <label for="insp-input-gal-${campo}" style="display:flex;align-items:center;justify-content:center;gap:6px;background:#10141F;border:1px dashed #00C2A8;border-radius:10px;padding:14px 8px;cursor:pointer;color:#5EEAD4;font-size:12px">🖼 Galeria</label>
+        </div>
       `}
     </div>
   `;
