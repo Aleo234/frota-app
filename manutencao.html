@@ -410,11 +410,11 @@ function showFormSolicitacao(){
         <label class="field-label" style="margin:0">Fotos (opcional)</label>
         <span id="fm-foto-count" style="font-size:11px;color:#7C8AAE;font-weight:700">0/10</span>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <input type="file" accept="image/*" capture="environment" id="fm-foto-input-cam" class="hidden" onchange="addFoto(this)"/>
-        <label for="fm-foto-input-cam" id="fm-foto-btn-cam" class="foto-btn-vazio" style="flex:1">📷 Câmera</label>
+        <label for="fm-foto-input-cam" id="fm-foto-btn-cam" class="foto-btn-vazio" style="width:auto">📷 Câmera</label>
         <input type="file" accept="image/*" id="fm-foto-input-gal" class="hidden" multiple onchange="addFoto(this)"/>
-        <label for="fm-foto-input-gal" id="fm-foto-btn-gal" class="foto-btn-vazio" style="flex:1">🖼 Galeria</label>
+        <label for="fm-foto-input-gal" id="fm-foto-btn-gal" class="foto-btn-vazio" style="width:auto">🖼 Galeria</label>
       </div>
       <div id="fm-foto-grid" style="margin-top:8px"></div>
 

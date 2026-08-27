@@ -2755,13 +2755,13 @@ async function showFormManutencao(id){
         <label class="field-label" style="margin:0">Fotos (opcional)</label>
         <span id="mn-foto-count" style="font-size:11px;color:#7C8AAE;font-weight:700">${manutFotosTmp.length}/10</span>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <input type="file" accept="image/*" capture="environment" id="mn-foto-input-cam" class="hidden" onchange="addFotoManut(this)"/>
-        <label for="mn-foto-input-cam" id="mn-foto-btn-cam" class="${manutFotosTmp.length>=10?'hidden':''}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px">
+        <label for="mn-foto-input-cam" id="mn-foto-btn-cam" class="${manutFotosTmp.length>=10?'hidden':''}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px">
           📷 Câmera
         </label>
         <input type="file" accept="image/*" id="mn-foto-input-gal" class="hidden" multiple onchange="addFotoManut(this)"/>
-        <label for="mn-foto-input-gal" id="mn-foto-btn-gal" class="${manutFotosTmp.length>=10?'hidden':''}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px">
+        <label for="mn-foto-input-gal" id="mn-foto-btn-gal" class="${manutFotosTmp.length>=10?'hidden':''}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px">
           🖼 Galeria
         </label>
       </div>
