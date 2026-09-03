@@ -80,7 +80,7 @@ input,textarea,button,select{font-family:inherit}
 const BACKEND = "https://frota-conecta-backend.onrender.com";
 let session = null, sessionToken = null;
 let servicosTmp = [], fotosTmp = [], pdfsTmp = [];
-const MAX_PDFS = 3;
+const MAX_PDFS = 2;
 const MAX_PDF_MB = 4;
 
 function $(id){ return document.getElementById(id); }
@@ -215,22 +215,72 @@ async function criarConta(){
 }
 
 // ===== HOME =====
+let minhasManutTmp = [];
+
 async function showHome(){
   render('<div class="text-center" style="padding-top:40px;color:#7C8AAE">Carregando...</div>');
-  let lista = [];
-  try{ lista = await api("GET","/api/manutencoes"); }catch(e){}
-  const ordenado = [...lista].sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
+  try{ minhasManutTmp = await api("GET","/api/manutencoes"); }catch(e){ minhasManutTmp = []; }
+  window._setorFiltroStatus = window._setorFiltroStatus || 'pendente';
+  renderHomeConteudo();
+}
+
+function renderHomeConteudo(){
+  const filtro = window._setorFiltroStatus || 'pendente';
+  const busca = (window._setorBusca||'').toLowerCase();
+  const pendentes = minhasManutTmp.filter(m=>(m.status||'pendente')==='pendente').length;
+  const andamento = minhasManutTmp.filter(m=>m.status==='andamento').length;
+  const concluidas = minhasManutTmp.filter(m=>m.status==='concluido').length;
+  const tabStyle = (s)=> s===filtro
+    ? 'padding:9px;border-radius:8px;border:1px solid #2E86D9;background:#2E86D922;color:#2E86D9;cursor:pointer;font-size:12px;font-weight:700'
+    : 'padding:9px;border-radius:8px;border:1px solid #2C3550;background:transparent;color:#7C8AAE;cursor:pointer;font-size:12px;font-weight:700';
+  let lista = [...minhasManutTmp];
+  if(filtro!=='todas') lista = lista.filter(m=>(m.status||'pendente')===filtro);
+  if(busca) lista = lista.filter(m=>(m.placa||'').toLowerCase().includes(busca)||(m.servicos||[]).join(' ').toLowerCase().includes(busca));
+  lista.sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
+
   render(`
     <div class="card text-center" style="padding:20px">
       <p style="color:#7C8AAE;font-size:12px">Logado como</p>
       <p style="font-weight:800;font-size:16px;margin-top:2px">${session.nome}</p>
     </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      <div class="card" style="padding:12px;text-align:center">
+        <div style="font-size:9px;color:#7C8AAE;text-transform:uppercase">Pendentes</div>
+        <div style="font-size:20px;font-weight:800;color:#C0392B">${pendentes}</div>
+      </div>
+      <div class="card" style="padding:12px;text-align:center">
+        <div style="font-size:9px;color:#7C8AAE;text-transform:uppercase">Andamento</div>
+        <div style="font-size:20px;font-weight:800;color:#5EEAD4">${andamento}</div>
+      </div>
+      <div class="card" style="padding:12px;text-align:center">
+        <div style="font-size:9px;color:#7C8AAE;text-transform:uppercase">Concluídas</div>
+        <div style="font-size:20px;font-weight:800;color:#81C784">${concluidas}</div>
+      </div>
+    </div>
+
     <button class="btn btn-primary" style="margin-bottom:10px" onclick="showFormSolicitacao()">🔧 Nova solicitação de manutenção</button>
-    <button class="btn btn-ghost" style="margin-bottom:16px" onclick="showInspecoesSetor()">📋 Inspeção Periódica</button>
+
+    <input id="setor-busca" value="${window._setorBusca||''}" placeholder="🔍 Buscar por placa ou serviço..."
+      style="width:100%;background:#1C2333;border:1px solid #2C3550;border-radius:8px;padding:9px 12px;color:#fff;font-size:13px;outline:none;margin-bottom:10px"
+      oninput="window._setorBusca=this.value;renderHomeConteudo();"/>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <button onclick="mudarFiltroSetor('pendente')" style="${tabStyle('pendente')}">Pendentes</button>
+      <button onclick="mudarFiltroSetor('andamento')" style="${tabStyle('andamento')}">Em andamento</button>
+      <button onclick="mudarFiltroSetor('concluido')" style="${tabStyle('concluido')}">Concluídas</button>
+      <button onclick="mudarFiltroSetor('todas')" style="${tabStyle('todas')}">Todas</button>
+    </div>
+
+    <button class="btn btn-ghost" style="margin-bottom:10px" onclick="showInspecoesSetor()">📋 Inspeção Periódica</button>
     ${renderBotaoNotificacao()}
-    <p style="color:#7C8AAE;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Minhas solicitações</p>
-    <div>${renderLista(ordenado)}</div>
+    <div id="setor-lista">${renderLista(lista)}</div>
   `);
+}
+
+function mudarFiltroSetor(status){
+  window._setorFiltroStatus = status;
+  renderHomeConteudo();
 }
 
 function badgeStatus(status){
@@ -254,10 +304,9 @@ function renderLista(lista){
   }).join('');
 }
 
-let _minhasSolicitacoes = [];
 async function mostrarDetalhe(id){
-  if(!_minhasSolicitacoes.length){ try{ _minhasSolicitacoes = await api("GET","/api/manutencoes"); }catch(e){} }
-  const m = _minhasSolicitacoes.find(x=>x.id===id);
+  if(!minhasManutTmp.length){ try{ minhasManutTmp = await api("GET","/api/manutencoes"); }catch(e){} }
+  const m = minhasManutTmp.find(x=>x.id===id);
   if(!m) return;
   const servicos = (m.servicos&&m.servicos.length)?m.servicos.join(", "):(m.tipoServico||"Manutenção");
   render(`
@@ -271,16 +320,18 @@ async function mostrarDetalhe(id){
         ${badgeStatus(m.status)}
       </div>
       ${m.descricao?`<p style="color:#C8D2EC;font-size:13px;margin-top:12px">${m.descricao}</p>`:''}
-      ${m.pdfs?.length?`<div style="margin-top:12px">${m.pdfs.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#8FC1EA;font-size:12px;text-decoration:none">📄 ${p.name}</a>`).join('')}</div>`:''}
+      ${m.pdfs?.length?`<div style="margin-top:12px">${m.pdfs.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#8FC1EA;font-size:12px;text-decoration:none">📎 ${p.name}</a>`).join('')}</div>`:''}
     </div>
     <div class="card">
       <div class="data-grid">
+        <div class="data-item"><label>KM na solicitação</label><p>${m.km?Number(m.km).toLocaleString('pt-BR')+' km':'—'}</p></div>
+        <div class="data-item"><label>Cidade do atendimento</label><p>${m.cidadeAtendimento||'—'}</p></div>
         <div class="data-item"><label>Data da solicitação</label><p>${fmtData(m.dataSolicitacao)}</p></div>
         <div class="data-item"><label>Data de resposta</label><p>${fmtData(m.dataResposta)}</p></div>
       </div>
       ${m.respostaEmpresa?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4">Resposta da empresa</p><p style="color:#C8D2EC;font-size:13px">${m.respostaEmpresa}</p></div>`:''}
       ${m.obsConclusao?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#81C784">Serviço executado</p><p style="color:#C8D2EC;font-size:13px">${m.obsConclusao}</p></div>`:''}
-      ${m.pdfsResposta?.length?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4;margin-bottom:8px">Anexos da empresa</p>${m.pdfsResposta.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#5EEAD4;font-size:12px;text-decoration:none">📄 ${p.name}</a>`).join('')}</div>`:''}
+      ${m.pdfsResposta?.length?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4;margin-bottom:8px">Anexos da empresa</p>${m.pdfsResposta.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#5EEAD4;font-size:12px;text-decoration:none">📎 ${p.name}</a>`).join('')}</div>`:''}
     </div>
   `);
 }
@@ -354,7 +405,7 @@ async function addPdf(input){
   const files = Array.from(input.files||[]);
   const vagas = MAX_PDFS - pdfsTmp.length;
   const sel = files.slice(0, vagas);
-  if(files.length > vagas) setErro('fm-erro', `Só foi possível adicionar ${vagas} PDF(s). Limite de ${MAX_PDFS}.`);
+  if(files.length > vagas) setErro('fm-erro', `Só foi possível adicionar ${vagas} anexo(s). Limite de ${MAX_PDFS}.`);
   for(const f of sel){
     if(f.size > MAX_PDF_MB*1024*1024){
       setErro('fm-erro', `O arquivo "${f.name}" passa de ${MAX_PDF_MB}MB e não foi adicionado.`);
@@ -379,7 +430,7 @@ function renderPdfList(){
   if(!pdfsTmp.length){ lista.innerHTML=''; return; }
   lista.innerHTML = pdfsTmp.map((p,i)=>`
     <div style="display:flex;align-items:center;justify-content:space-between;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px">
-      <span style="font-size:12px;color:#C8D2EC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px">📄 ${p.name}</span>
+      <span style="font-size:12px;color:#C8D2EC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px">📎 ${p.name}</span>
       <button onclick="removePdf(${i})" style="background:transparent;border:none;color:#FF9B8A;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px">×</button>
     </div>`).join('');
 }
@@ -391,9 +442,28 @@ function showFormSolicitacao(){
   render(`
     <button class="volta-btn" onclick="showHome()">← Voltar</button>
     <div style="font-weight:800;font-size:16px;margin-bottom:16px">🔧 Nova Solicitação</div>
+
+    <div style="background:#2E86D911;border:1px solid #2E86D955;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <p style="color:#8FC1EA;font-size:12px;font-weight:700;margin-bottom:6px">⚠ Para registrar a solicitação, é obrigatório informar:</p>
+      <ul style="margin:0;padding-left:18px;color:#C8D2EC;font-size:12px;line-height:1.6">
+        <li>Placa/identificação do veículo;</li>
+        <li>Quilometragem atual;</li>
+        <li>Descrição do motivo da solicitação (revisão devida, defeito apresentado, ou relato do sinistro);</li>
+        <li>Fotos pertinentes (placa e quilometragem; e, no caso de defeito/sinistro, fotos do problema/local);</li>
+        <li>Informar a cidade do atendimento.</li>
+      </ul>
+      <p style="color:#FF9B8A;font-size:11px;font-weight:700;margin-top:8px;margin-bottom:0">⚠ Em caso de sinistro, é obrigatório anexar o Boletim de Ocorrência e a CNH do motorista.</p>
+    </div>
+
     <div class="card">
       <label class="field-label">Placa do veículo *</label>
       <input class="field-input" id="fm-placa" placeholder="ABC1D23" maxlength="8" oninput="this.value=this.value.toUpperCase()"/>
+
+      <label class="field-label">Quilometragem atual *</label>
+      <input class="field-input" id="fm-km" type="number" inputmode="numeric" placeholder="Ex: 45230"/>
+
+      <label class="field-label">Cidade do atendimento *</label>
+      <input class="field-input" id="fm-cidade" placeholder="Ex: Porto Velho"/>
 
       <label class="field-label">Serviços necessários *</label>
       <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -403,13 +473,14 @@ function showFormSolicitacao(){
       </div>
       <div id="fm-servicos-lista">${renderServicosTags()}</div>
 
-      <label class="field-label">Descrição do problema</label>
-      <textarea class="field-textarea" id="fm-desc" rows="3" placeholder="Descreva o que está acontecendo (opcional)"></textarea>
+      <label class="field-label">Descrição do motivo *</label>
+      <textarea class="field-textarea" id="fm-desc" rows="3" placeholder="Ex: revisão devida, defeito apresentado, ou relato do sinistro..."></textarea>
 
       <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-        <label class="field-label" style="margin:0">Fotos (opcional)</label>
+        <label class="field-label" style="margin:0">Fotos *</label>
         <span id="fm-foto-count" style="font-size:11px;color:#7C8AAE;font-weight:700">0/10</span>
       </div>
+      <p style="color:#7C8AAE;font-size:11px;margin-top:-6px;margin-bottom:8px">Fotos da placa e do painel (KM). Se for defeito ou sinistro, inclua também fotos do problema/local.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <input type="file" accept="image/*" capture="environment" id="fm-foto-input-cam" class="hidden" onchange="addFoto(this)"/>
         <label for="fm-foto-input-cam" id="fm-foto-btn-cam" class="foto-btn-vazio" style="width:auto">📷 Câmera</label>
@@ -419,13 +490,14 @@ function showFormSolicitacao(){
       <div id="fm-foto-grid" style="margin-top:8px"></div>
 
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;margin-top:16px">
-        <label class="field-label" style="margin:0">PDF (opcional)</label>
+        <label class="field-label" style="margin:0">Anexos (opcional)</label>
         <span id="fm-pdf-count" style="font-size:11px;color:#7C8AAE;font-weight:700">0/${MAX_PDFS}</span>
       </div>
-      <input type="file" accept="application/pdf" id="fm-pdf-input" class="hidden" multiple onchange="addPdf(this)"/>
-      <label for="fm-pdf-input" id="fm-pdf-btn-label" class="foto-btn-vazio">📄 Adicionar PDF</label>
+      <p style="color:#7C8AAE;font-size:11px;margin-top:-6px;margin-bottom:8px">Em caso de sinistro: Boletim de Ocorrência e CNH do motorista.</p>
+      <input type="file" accept="application/pdf,image/*" id="fm-pdf-input" class="hidden" multiple onchange="addPdf(this)"/>
+      <label for="fm-pdf-input" id="fm-pdf-btn-label" class="foto-btn-vazio">📎 Adicionar anexo (B.O., CNH...)</label>
       <div id="fm-pdf-lista" style="margin-top:8px"></div>
-      <p style="color:#5C6889;font-size:11px;margin-bottom:0">Até ${MAX_PDFS} arquivos, ${MAX_PDF_MB}MB cada.</p>
+      <p style="color:#5C6889;font-size:11px;margin-bottom:0">Até ${MAX_PDFS} arquivos, ${MAX_PDF_MB}MB cada. PDF ou foto.</p>
 
       <div id="fm-erro" style="margin-top:12px"></div>
       <button class="btn btn-primary" id="fm-btn" style="margin-top:14px" onclick="enviarSolicitacao()">📧 Enviar solicitação</button>
@@ -435,8 +507,15 @@ function showFormSolicitacao(){
 
 async function enviarSolicitacao(){
   const placa = $("fm-placa")?.value?.trim().toUpperCase();
+  const km = parseInt($("fm-km")?.value, 10);
+  const cidade = $("fm-cidade")?.value?.trim();
   const descricao = $("fm-desc")?.value?.trim()||'';
-  if(!placa||!servicosTmp.length){ setErro("fm-erro","Informe a placa e ao menos um serviço."); return; }
+  if(!placa){ setErro("fm-erro","Informe a placa do veículo."); return; }
+  if(!km || km<0){ setErro("fm-erro","Informe a quilometragem atual."); return; }
+  if(!cidade){ setErro("fm-erro","Informe a cidade do atendimento."); return; }
+  if(!servicosTmp.length){ setErro("fm-erro","Adicione ao menos um serviço."); return; }
+  if(!descricao){ setErro("fm-erro","Descreva o motivo da solicitação."); return; }
+  if(!fotosTmp.length){ setErro("fm-erro","Anexe ao menos uma foto (placa e/ou quilometragem)."); return; }
 
   const btn = $("fm-btn");
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Enviando...';
@@ -444,6 +523,8 @@ async function enviarSolicitacao(){
   const registro = {
     id: uid(),
     placa,
+    km,
+    cidadeAtendimento: cidade,
     servicos: [...servicosTmp],
     descricao,
     dataSolicitacao: Date.now(),

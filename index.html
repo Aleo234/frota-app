@@ -2612,9 +2612,9 @@ function readFileAsDataURLManut(file){ return new Promise((res,rej)=>{
 
 async function addPdfManut(input){
   const files = Array.from(input.files||[]);
-  const vagas = 3-manutPdfsTmp.length;
+  const vagas = 2-manutPdfsTmp.length;
   const sel = files.slice(0, vagas);
-  if(files.length > vagas) setErro('mn-erro', `Só foi possível adicionar ${vagas} PDF(s). Limite de 3.`);
+  if(files.length > vagas) setErro('mn-erro', `Só foi possível adicionar ${vagas} anexo(s). Limite de 2.`);
   for(const f of sel){
     if(f.size > 4*1024*1024){
       setErro('mn-erro', `O arquivo "${f.name}" passa de 4MB e não foi adicionado.`);
@@ -2633,7 +2633,7 @@ function renderPdfListaManut(){
   if(!manutPdfsTmp.length) return '';
   return manutPdfsTmp.map((p,i)=>`
     <div style="display:flex;align-items:center;justify-content:space-between;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px">
-      <span style="font-size:12px;color:#C8D2EC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px">📄 ${p.name}</span>
+      <span style="font-size:12px;color:#C8D2EC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px">📎 ${p.name}</span>
       <button onclick="removePdfManut(${i})" style="background:transparent;border:none;color:#FF9B8A;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px">×</button>
     </div>`).join('');
 }
@@ -2642,8 +2642,8 @@ function renderPdfListManut(){
   const count = $('mn-pdf-count');
   const btn = $('mn-pdf-btn-label');
   const lista = $('mn-pdf-lista');
-  if(count) count.textContent = manutPdfsTmp.length+'/3';
-  if(btn) btn.classList.toggle('hidden', manutPdfsTmp.length>=3);
+  if(count) count.textContent = manutPdfsTmp.length+'/2';
+  if(btn) btn.classList.toggle('hidden', manutPdfsTmp.length>=2);
   if(lista) lista.innerHTML = renderPdfListaManut();
 }
 
@@ -2724,9 +2724,28 @@ async function showFormManutencao(id){
   render(`
     <button class="volta-btn" onclick="${voltar}">← Voltar</button>
     <div style="font-weight:800;font-size:16px;margin-bottom:16px">${id?'✏ Editar':'🔧 Registrar'} Manutenção</div>
+
+    <div style="background:#2E86D911;border:1px solid #2E86D955;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <p style="color:#8FC1EA;font-size:12px;font-weight:700;margin-bottom:6px">⚠ Para registrar a solicitação, é obrigatório informar:</p>
+      <ul style="margin:0;padding-left:18px;color:#C8D2EC;font-size:12px;line-height:1.6">
+        <li>Placa/identificação do veículo;</li>
+        <li>Quilometragem atual;</li>
+        <li>Descrição do motivo da solicitação (revisão devida, defeito apresentado, ou relato do sinistro);</li>
+        <li>Fotos pertinentes (placa e quilometragem; e, no caso de defeito/sinistro, fotos do problema/local);</li>
+        <li>Informar a cidade do atendimento.</li>
+      </ul>
+      <p style="color:#FF9B8A;font-size:11px;font-weight:700;margin-top:8px;margin-bottom:0">⚠ Em caso de sinistro, é obrigatório anexar o Boletim de Ocorrência e a CNH do motorista.</p>
+    </div>
+
     <div class="card">
       <label class="field-label">Placa *</label>
       <input class="field-input" id="mn-placa" value="${m.placa||''}" placeholder="ABC1D23" maxlength="8" oninput="this.value=this.value.toUpperCase()"/>
+
+      <label class="field-label">Quilometragem atual *</label>
+      <input class="field-input" id="mn-km" type="number" inputmode="numeric" value="${m.km||''}" placeholder="Ex: 45230"/>
+
+      <label class="field-label">Cidade do atendimento *</label>
+      <input class="field-input" id="mn-cidade" value="${m.cidadeAtendimento||''}" placeholder="Ex: Porto Velho"/>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <label class="field-label" style="margin:0">Setor/Gabinete solicitante *</label>
@@ -2745,16 +2764,17 @@ async function showFormManutencao(id){
       </div>
       <div id="mn-servicos-lista" style="margin-bottom:12px">${renderServicosManutTags()}</div>
 
-      <label class="field-label">Descrição / detalhes do pedido</label>
-      <textarea class="field-textarea" id="mn-desc" rows="3" placeholder="Detalhes do e-mail enviado à empresa (opcional)">${m.descricao||''}</textarea>
+      <label class="field-label">Descrição do motivo *</label>
+      <textarea class="field-textarea" id="mn-desc" rows="3" placeholder="Ex: revisão devida, defeito apresentado, ou relato do sinistro...">${m.descricao||''}</textarea>
 
       <label class="field-label">Data da solicitação (data do e-mail) *</label>
       <input type="date" class="field-input" id="mn-data-sol" value="${dataSolInput}"/>
 
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;margin-top:4px">
-        <label class="field-label" style="margin:0">Fotos (opcional)</label>
+        <label class="field-label" style="margin:0">Fotos *</label>
         <span id="mn-foto-count" style="font-size:11px;color:#7C8AAE;font-weight:700">${manutFotosTmp.length}/10</span>
       </div>
+      <p style="color:#7C8AAE;font-size:11px;margin-top:-6px;margin-bottom:8px">Fotos da placa e do painel (KM). Se for defeito ou sinistro, inclua também fotos do problema/local.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <input type="file" accept="image/*" capture="environment" id="mn-foto-input-cam" class="hidden" onchange="addFotoManut(this)"/>
         <label for="mn-foto-input-cam" id="mn-foto-btn-cam" class="${manutFotosTmp.length>=10?'hidden':''}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px">
@@ -2768,15 +2788,16 @@ async function showFormManutencao(id){
       <div id="mn-foto-grid" style="margin-top:8px">${manutFotosTmp.length?`<div class="foto-grid">${manutFotosTmp.map((src,i)=>`<div class="foto-item"><img src="${src}" alt="foto ${i+1}"/><button class="foto-del" onclick="removeFotoManut(${i})">×</button><div class="foto-num">${i+1}</div></div>`).join('')}</div>`:''}</div>
 
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;margin-top:16px">
-        <label class="field-label" style="margin:0">PDF (opcional)</label>
-        <span id="mn-pdf-count" style="font-size:11px;color:#7C8AAE;font-weight:700">${manutPdfsTmp.length}/3</span>
+        <label class="field-label" style="margin:0">Anexos (opcional)</label>
+        <span id="mn-pdf-count" style="font-size:11px;color:#7C8AAE;font-weight:700">${manutPdfsTmp.length}/2</span>
       </div>
-      <input type="file" accept="application/pdf" id="mn-pdf-input" class="hidden" multiple onchange="addPdfManut(this)"/>
-      <label for="mn-pdf-input" id="mn-pdf-btn-label" class="${manutPdfsTmp.length>=3?'hidden':''}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px">
-        📄 Adicionar PDF
+      <p style="color:#7C8AAE;font-size:11px;margin-top:-6px;margin-bottom:8px">Em caso de sinistro: Boletim de Ocorrência e CNH do motorista.</p>
+      <input type="file" accept="application/pdf,image/*" id="mn-pdf-input" class="hidden" multiple onchange="addPdfManut(this)"/>
+      <label for="mn-pdf-input" id="mn-pdf-btn-label" class="${manutPdfsTmp.length>=2?'hidden':''}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#10141F;border:1px dashed #2E86D9;border-radius:10px;padding:12px;cursor:pointer;color:#8FC1EA;font-size:13px">
+        📎 Adicionar anexo (B.O., CNH...)
       </label>
       <div id="mn-pdf-lista" style="margin-top:8px">${renderPdfListaManut()}</div>
-      <p style="color:#5C6889;font-size:11px;margin-top:6px">Até 3 arquivos, 4MB cada.</p>
+      <p style="color:#5C6889;font-size:11px;margin-top:6px">Até 2 arquivos, 4MB cada. PDF ou foto.</p>
 
       <div id="mn-erro" style="margin-top:8px"></div>
       <button class="btn btn-primary" style="margin-top:14px" onclick="salvarManutencao('${id||''}')">
@@ -2788,10 +2809,19 @@ async function showFormManutencao(id){
 
 async function salvarManutencao(id){
   const placa = $("mn-placa")?.value?.trim().toUpperCase();
+  const km = parseInt($("mn-km")?.value, 10);
+  const cidadeAtendimento = $("mn-cidade")?.value?.trim();
   const setor = $("mn-setor")?.value?.trim();
   const descricao = $("mn-desc")?.value?.trim()||'';
   const dataSolInput = $("mn-data-sol")?.value;
-  if(!placa||!setor||!manutServicosTmp.length||!dataSolInput){ setErro("mn-erro","Preencha placa, setor, ao menos um serviço e a data da solicitação."); return; }
+  if(!placa){ setErro("mn-erro","Informe a placa."); return; }
+  if(!km || km<0){ setErro("mn-erro","Informe a quilometragem atual."); return; }
+  if(!cidadeAtendimento){ setErro("mn-erro","Informe a cidade do atendimento."); return; }
+  if(!setor){ setErro("mn-erro","Selecione o setor solicitante."); return; }
+  if(!manutServicosTmp.length){ setErro("mn-erro","Adicione ao menos um serviço."); return; }
+  if(!descricao){ setErro("mn-erro","Descreva o motivo da solicitação."); return; }
+  if(!dataSolInput){ setErro("mn-erro","Informe a data da solicitação."); return; }
+  if(!manutFotosTmp.length){ setErro("mn-erro","Anexe ao menos uma foto (placa e/ou quilometragem)."); return; }
 
   const dataSolicitacao = new Date(dataSolInput).getTime();
   const servicos = [...manutServicosTmp];
@@ -2800,14 +2830,14 @@ async function salvarManutencao(id){
 
   try{
     if(id){
-      const atualizado = await updateManutencao(id, { placa, setor, servicos, descricao, dataSolicitacao, fotos: fotosDaManut, pdfs: pdfsDaManut });
+      const atualizado = await updateManutencao(id, { placa, km, cidadeAtendimento, setor, servicos, descricao, dataSolicitacao, fotos: fotosDaManut, pdfs: pdfsDaManut });
       const idx = manutencoes.findIndex(x=>x.id===id);
       if(idx>=0) manutencoes[idx]=atualizado;
       showDetalheManutencao(id);
     } else {
       const novo = {
         id: uid(),
-        placa, setor, servicos, descricao,
+        placa, km, cidadeAtendimento, setor, servicos, descricao,
         dataSolicitacao,
         dataResposta: null,
         obsConclusao: '',
@@ -2846,19 +2876,21 @@ async function showDetalheManutencao(id){
       ${atrasada?`<div style="color:#FF9F1C;font-size:12px;font-weight:700;margin-top:10px">⏰ Em aberto há ${diasEmAbertoManut(m)} dias</div>`:''}
       ${m.descricao?`<p style="color:#C8D2EC;font-size:13px;margin-top:12px">${m.descricao}</p>`:''}
       ${m.fotos?.length?`<div style="margin-top:12px"><p style="color:#7C8AAE;font-size:11px;margin-bottom:8px">${m.fotos.length} foto(s)</p><div class="foto-grid">${m.fotos.map((src,i)=>`<div class="foto-item"><img src="${src}"/><div class="foto-num">${i+1}</div></div>`).join('')}</div></div>`:''}
-      ${m.pdfs?.length?`<div style="margin-top:12px"><p style="color:#7C8AAE;font-size:11px;margin-bottom:8px">${m.pdfs.length} PDF(s) anexado(s)</p>${m.pdfs.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#8FC1EA;font-size:12px;text-decoration:none">📄 ${p.name}</a>`).join('')}</div>`:''}
+      ${m.pdfs?.length?`<div style="margin-top:12px"><p style="color:#7C8AAE;font-size:11px;margin-bottom:8px">${m.pdfs.length} PDF(s) anexado(s)</p>${m.pdfs.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#8FC1EA;font-size:12px;text-decoration:none">📎 ${p.name}</a>`).join('')}</div>`:''}
     </div>
     <div class="card">
       <div class="data-grid">
         <div class="data-item"><label>Setor/Gabinete</label><p>${m.setor||'—'}</p></div>
         <div class="data-item"><label>E-mail do setor</label><p style="font-family:monospace;font-size:11px">${m.emailSetor||'—'}</p></div>
+        <div class="data-item"><label>KM na solicitação</label><p>${m.km?Number(m.km).toLocaleString('pt-BR')+' km':'—'}</p></div>
+        <div class="data-item"><label>Cidade do atendimento</label><p>${m.cidadeAtendimento||'—'}</p></div>
         <div class="data-item"><label>Data da solicitação</label><p>${m.dataSolicitacao?new Date(m.dataSolicitacao).toLocaleDateString('pt-BR'):'—'}</p></div>
         <div class="data-item"><label>Data de resposta</label><p>${m.dataResposta?new Date(m.dataResposta).toLocaleDateString('pt-BR'):'—'}</p></div>
         <div class="data-item"><label>Registrado por</label><p>${m.registradoPor||'—'}</p></div>
       </div>
       ${m.respostaEmpresa?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4">Resposta da empresa</p><p style="color:#C8D2EC;font-size:13px">${m.respostaEmpresa}</p></div>`:''}
       ${m.obsConclusao?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#81C784">Serviço executado / observações</p><p style="color:#C8D2EC;font-size:13px">${m.obsConclusao}</p></div>`:''}
-      ${m.pdfsResposta?.length?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4;margin-bottom:8px">Anexos da empresa</p>${m.pdfsResposta.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#5EEAD4;font-size:12px;text-decoration:none">📄 ${p.name}</a>`).join('')}</div>`:''}
+      ${m.pdfsResposta?.length?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4;margin-bottom:8px">Anexos da empresa</p>${m.pdfsResposta.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#5EEAD4;font-size:12px;text-decoration:none">📎 ${p.name}</a>`).join('')}</div>`:''}
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       ${st==='pendente'?`<button onclick="showIniciarManutencao('${id}')" style="flex:1;min-width:110px;padding:10px;border-radius:8px;border:1px solid #00C2A8;background:#00C2A822;color:#5EEAD4;cursor:pointer;font-size:12px;font-weight:700">▶ Iniciar</button>`:''}
@@ -3046,6 +3078,8 @@ function gerarRelatorioManutencoesPDF(){
 
   const rows = lista.map(m=>`<tr>
     <td>${m.placa}</td>
+    <td>${m.km?Number(m.km).toLocaleString('pt-BR'):'—'}</td>
+    <td>${m.cidadeAtendimento||'—'}</td>
     <td>${m.setor||'—'}</td>
     <td>${m.emailSetor||'—'}</td>
     <td>${resumoServicos(m)}</td>
@@ -3069,7 +3103,7 @@ function gerarRelatorioManutencoesPDF(){
     <div><label>Concluídas</label><p>${concluidas.length}</p></div>
     <div><label>Tempo médio de resposta</label><p>${tempoMedio!=null?dur(tempoMedio):'—'}</p></div>
   </div>
-  <table><thead><tr><th>Placa</th><th>Setor</th><th>E-mail do setor</th><th>Serviços</th><th>Solicitação</th><th>Descrição</th><th>Resposta da empresa</th><th>Data resposta</th><th>Status</th><th>Serviço executado</th></tr></thead>
+  <table><thead><tr><th>Placa</th><th>KM</th><th>Cidade</th><th>Setor</th><th>E-mail do setor</th><th>Serviços</th><th>Solicitação</th><th>Descrição</th><th>Resposta da empresa</th><th>Data resposta</th><th>Status</th><th>Serviço executado</th></tr></thead>
   <tbody>${rows}</tbody></table>
   <div class="footer">Frota Conecta · ${fmt(Date.now())}</div>
   <script>window.onload=()=>window.print();<\/script></body></html>`;
@@ -3086,9 +3120,11 @@ function csvEscapeManut(v){
 function gerarRelatorioManutencoesCSV(){
   const lista = filtrarManutencoesRelatorio();
   if(!lista) return;
-  const header = ['Placa','Setor','Email do setor','Servicos','Data solicitacao','Descricao','Resposta da empresa','Data resposta','Status','Servico executado'];
+  const header = ['Placa','KM','Cidade','Setor','Email do setor','Servicos','Data solicitacao','Descricao','Resposta da empresa','Data resposta','Status','Servico executado'];
   const linhas = lista.map(m=>[
     m.placa,
+    m.km||'',
+    m.cidadeAtendimento||'',
     m.setor||'',
     m.emailSetor||'',
     resumoServicos(m),

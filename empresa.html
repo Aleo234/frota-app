@@ -310,11 +310,13 @@ async function mostrarDetalhe(id){
       </div>
       ${m.descricao?`<p style="color:#C8D2EC;font-size:13px;margin-top:12px">${m.descricao}</p>`:''}
       ${m.fotos?.length?`<div style="margin-top:12px"><p style="color:#7C8AAE;font-size:11px;margin-bottom:8px">${m.fotos.length} foto(s) do setor</p><div class="foto-grid">${m.fotos.map((src,i)=>`<div class="foto-item"><img src="${src}"/><div class="foto-num">${i+1}</div></div>`).join('')}</div></div>`:''}
-      ${m.pdfs?.length?`<div style="margin-top:12px">${m.pdfs.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#8FC1EA;font-size:12px;text-decoration:none">📄 ${p.name}</a>`).join('')}</div>`:''}
+      ${m.pdfs?.length?`<div style="margin-top:12px">${m.pdfs.map(p=>`<a href="${p.data}" download="${p.name}" style="display:flex;align-items:center;gap:8px;background:#10141F;border:1px solid #2C3550;border-radius:8px;padding:8px 10px;margin-bottom:6px;color:#8FC1EA;font-size:12px;text-decoration:none">📎 ${p.name}</a>`).join('')}</div>`:''}
     </div>
     <div class="card">
       <div class="data-grid">
         <div class="data-item"><label>Setor/Gabinete</label><p>${m.setor||'—'}</p></div>
+        <div class="data-item"><label>KM na solicitação</label><p>${m.km?Number(m.km).toLocaleString('pt-BR')+' km':'—'}</p></div>
+        <div class="data-item"><label>Cidade do atendimento</label><p>${m.cidadeAtendimento||'—'}</p></div>
         <div class="data-item"><label>Data da solicitação</label><p>${fmtData(m.dataSolicitacao)}</p></div>
       </div>
       ${m.respostaEmpresa?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #2C3550"><p class="field-label" style="color:#5EEAD4">Sua resposta</p><p style="color:#C8D2EC;font-size:13px">${m.respostaEmpresa}</p></div>`:''}
