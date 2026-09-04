@@ -407,12 +407,16 @@ async function addPdf(input){
   const sel = files.slice(0, vagas);
   if(files.length > vagas) setErro('fm-erro', `Só foi possível adicionar ${vagas} anexo(s). Limite de ${MAX_PDFS}.`);
   for(const f of sel){
-    if(f.size > MAX_PDF_MB*1024*1024){
+    const ehImagem = f.type.startsWith('image/');
+    // O limite de tamanho só se aplica a arquivos que NÃO são foto (ex: PDF de
+    // verdade) — fotos são comprimidas antes de guardar, então mesmo uma foto
+    // grande do celular fica pequena depois.
+    if(!ehImagem && f.size > MAX_PDF_MB*1024*1024){
       setErro('fm-erro', `O arquivo "${f.name}" passa de ${MAX_PDF_MB}MB e não foi adicionado.`);
       continue;
     }
     try{
-      const data = await readFileAsDataURL(f);
+      const data = ehImagem ? await compressImage(f) : await readFileAsDataURL(f);
       pdfsTmp.push({ name: f.name, data });
     }catch(e){}
   }

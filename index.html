@@ -2616,12 +2616,13 @@ async function addPdfManut(input){
   const sel = files.slice(0, vagas);
   if(files.length > vagas) setErro('mn-erro', `Só foi possível adicionar ${vagas} anexo(s). Limite de 2.`);
   for(const f of sel){
-    if(f.size > 4*1024*1024){
+    const ehImagem = f.type.startsWith('image/');
+    if(!ehImagem && f.size > 4*1024*1024){
       setErro('mn-erro', `O arquivo "${f.name}" passa de 4MB e não foi adicionado.`);
       continue;
     }
     try{
-      const data = await readFileAsDataURLManut(f);
+      const data = ehImagem ? await compressImage(f) : await readFileAsDataURLManut(f);
       manutPdfsTmp.push({ name: f.name, data });
     }catch(e){}
   }
